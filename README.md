@@ -15,6 +15,10 @@ Canonical repo, issues and releases: https://gitlab.com/aa22396584/aave-oracle-l
 
 **Risk: this is a leveraged short-ETH position, not risk-free arbitrage. If ETH rises far enough, the position is liquidated. Aave can freeze markets at any time.**
 
+![Rehearsal on an Ethereum mainnet fork](docs/demo.gif)
+
+*Rehearsal on a local anvil fork of Ethereum mainnet with the current code: Aave unfreezes, ETH on Uniswap is pushed 10% above the oracle, the bot opens, prices converge, it closes and exits: 100,000 → 116,484 USDC. The events are simulated and time is compressed; it is not a real trade.*
+
 CLI messages and code comments are in Traditional Chinese for now.
 
 ## Background
@@ -34,6 +38,8 @@ The most profitable address sold 12,289 ETH at about $2,580 and bought back 12,3
 For what others actually did, see [How others did it](#how-others-did-it).
 
 ## How it works
+
+![How it works](docs/diagram.png)
 
 `src/OracleLagArb.sol` uses a Uniswap V3 flash swap to compress steps 2 to 4 above into **one transaction**:
 
@@ -648,6 +654,10 @@ Compiled on 2026-10-30. Times are UTC. Items marked "single source" have only on
 a price floor guarantees the worst fill; buys back automatically after convergence; doesn't open while frozen and deposits principal automatically after the unfreeze. Not done: exchange hedging, the reverse direction, other lending protocols.
 
 ## Rehearsal records (2026-10-30, anvil fork)
+
+**Demo run (mainnet, current code, the GIF above)**: Aave frozen → the bot deploys and waits; unfreeze → it deposits 100,000 USDC;
+Uniswap USDC 0.05% pushed to +10.09% → after 15 s it opens in two chunks (73.02 + 5.63 WETH; health factor 1.337, then 1.303); price pushed back to the oracle →
+it buys back in two pools until each hits the +0.3% limit; `exit` buys the remaining 21.85 WETH and withdraws: **100,000 → 116,484.18 USDC**.
 
 **Single chain (mainnet)**: starting from Aave's real frozen state, `node start.ts --yes --deposit 100000`:
 deploy → principal pending → simulated unfreeze, automatic deposit → Uniswap pushed up 10%, opened in 3 transactions → closed after returning to the oracle price: **100,000 → 115,979 USDC**.
