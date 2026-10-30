@@ -34,8 +34,8 @@ The app's **Share** button is different: "Sharing doesn't make a copy"
 secrets its owner added", and where a secret card's value is kept when someone else fills it in is not documented.
 Use the template for anything involving wallets.
 
-After you change the persona, update the template in the app too; whether a template follows later edits of the bot
-is not documented.
+A template is a snapshot: it doesn't follow later edits of the bot's persona. After changing the persona, ask the bot
+to publish a new template version; it sends a confirmation card, and the new version is live once you confirm.
 
 ## Persona
 

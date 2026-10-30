@@ -408,10 +408,11 @@ cp -r skills/aave-oracle-lag-arb ~/.agents/skills/    # Codex
 
 ```bash
 cp -r skills/aave-oracle-lag-arb ~/.hermes/skills/
-hermes skills reload
+hermes skills list | grep aave-oracle-lag-arb   # 有沒有讀到；已經開著的對話用 /reload-skills 更新斜線指令
 ```
 
-GitHub 鏡像建好之後，也可以用 `hermes skills install` 從那裡裝（選用）。
+Hermes 也能用 `hermes skills install <owner>/<repo>/<路徑>` 從 GitHub 裝 skill：鏡像是 `akari-sora/aave-oracle-lag-arb`，
+skill 路徑 `skills/aave-oracle-lag-arb`（沒測過）。
 裝好之後請 Hermes 安裝機器人，並排程每 6 小時跑一次 `trader.sh ensure` 和 `trader.sh check`。
 
 ### Grok Bot

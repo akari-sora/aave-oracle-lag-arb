@@ -408,10 +408,11 @@ cp -r skills/aave-oracle-lag-arb ~/.agents/skills/    # Codex
 
 ```bash
 cp -r skills/aave-oracle-lag-arb ~/.hermes/skills/
-hermes skills reload
+hermes skills list | grep aave-oracle-lag-arb   # picked up? in an open session, /reload-skills refreshes slash commands
 ```
 
-Once the GitHub mirror exists, you can also install it from there with `hermes skills install` (optional).
+Hermes can also install skills from a GitHub path with `hermes skills install <owner>/<repo>/<path>`; the mirror is
+`akari-sora/aave-oracle-lag-arb`, skill path `skills/aave-oracle-lag-arb` (not tested).
 Then ask Hermes to install the bot and schedule `trader.sh ensure` followed by `trader.sh check` every 6 hours.
 
 ### Grok Bot
