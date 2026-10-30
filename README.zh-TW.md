@@ -480,7 +480,7 @@ cron 的 PATH 很短；`node` 不在 `/usr/bin` 的話（例如用 nvm 裝的）
 | `trader_crashloop` | critical | `trader.sh` 底下的機器人連續 3 次啟動後 5 分鐘內就結束，最後一次在 15 分鐘內（例如 1Password 讀不到 key） |
 | `rpc_error:<鏈>` | warning | 讀不到這條鏈的資料（只有 `check` 會出現） |
 | `position_open:<鏈>` | info | 持倉中 |
-| `aave_frozen:<鏈>` | info | 這條鏈 Aave V3 的 WETH 凍結中 |
+| `aave_frozen:<鏈>` | info | 這條鏈借不到：Aave V3 的 WETH 凍結中，或沒有穩定幣能當抵押（凍結或 LTV 0） |
 
 ### 排程查詢
 
@@ -503,7 +503,7 @@ cron 的 PATH 很短；`node` 不在 `/usr/bin` 的話（例如用 nvm 裝的）
 {"source": "aave-u-eth", "host": "…", "chain": "base", "time": "…", "block": "53272934", "findings": [...], "new": ["premium_open:base"], "resolved": []}
 ```
 
-`aave_frozen:<鏈>` 出現在 `resolved` 就代表那條鏈的 Aave 解凍了。webhook 不等回應（逾時 10 秒），不會拖慢交易判斷。
+`aave_frozen:<鏈>` 出現在 `resolved` 就代表那條鏈又借得到了（WETH 解凍、而且有穩定幣 LTV 大於 0）。webhook 不等回應（逾時 10 秒），不會拖慢交易判斷。
 
 ### 設定 webhook（set-alerts.sh）
 

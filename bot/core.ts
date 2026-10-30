@@ -436,7 +436,11 @@ export const livePools = (m: Market) => m.quotes.filter((q) => q.poolWeth >= CFG
 export function describe(ctx: Ctx, m: Market, p?: Position) {
   const pools = livePools(m).map((q) => `${q.name} ${pct(q.premiumBps)}`).join(" | ");
   const borrowable = Number(formatUnits(m.wethBorrowable, 18)).toFixed(0);
-  const aave = m.wethFrozen ? tr("Aave 凍結中", "Aave frozen") : tr(`WETH 可借 ${borrowable}`, `WETH borrowable ${borrowable}`);
+  const aave = m.wethFrozen
+    ? tr("Aave 凍結中", "Aave frozen")
+    : ![...m.stableOk.values()].some(Boolean)
+      ? tr("穩定幣 LTV 0，借不到", "stablecoin LTV 0, can't borrow")
+      : tr(`WETH 可借 ${borrowable}`, `WETH borrowable ${borrowable}`);
   let pos = "";
   if (p) {
     const coll = [...p.collateral]
@@ -1046,7 +1050,10 @@ export function findings(ctx: Ctx, m: Market, p: Position | undefined, alive: bo
     const [d, hf] = [Number(formatUnits(debt, 18)).toFixed(3), fmtHf(p!.hf)];
     out.push({ level: "info", code: `position_open:${k}`, kind: "condition", message: tr(`${n} 持倉中：債 ${d} WETH，健康因子 ${hf}`, `${n} position open: debt ${d} WETH, health factor ${hf}`) });
   }
+  // 凍結或穩定幣都不能當抵押（LTV 0）都算借不到：解凍後 LTV 常常還是 0，這時候 resolved 不能代表能做了
   if (m.wethFrozen) out.push({ level: "info", code: `aave_frozen:${k}`, kind: "condition", message: tr(`${n} Aave V3 的 WETH 凍結中，不能借`, `${n} Aave V3 WETH is frozen, can't borrow`) });
+  else if (![...m.stableOk.values()].some(Boolean))
+    out.push({ level: "info", code: `aave_frozen:${k}`, kind: "condition", message: tr(`${n} Aave V3 的穩定幣 LTV 是 0（或凍結），存了也借不到`, `${n} Aave V3 stablecoins have LTV 0 (or are frozen), can't borrow against them`) });
   return out;
 }
 

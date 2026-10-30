@@ -468,7 +468,7 @@ cron は最小限の `PATH` で起動するため、`node` が `/usr/bin` にな
 | `trader_crashloop` | critical | `trader.sh` 配下のボットが起動後 5 分以内に終了する事象が 3 回連続で発生し、最新の終了が 15 分以内である（例: 1Password から鍵を読み取れないなど） |
 | `rpc_error:<chain>` | warning | このチェーンの状態を読み取れなかった（`check` 実行時のみ） |
 | `position_open:<chain>` | info | ポジションを保有中 |
-| `aave_frozen:<chain>` | info | このチェーンの Aave V3 WETH が凍結中 |
+| `aave_frozen:<chain>` | info | このチェーンでは借入できない：Aave V3 の WETH が凍結中、または担保にできるステーブルコインがない（凍結または LTV 0） |
 
 ### 定期チェック (Scheduled check)
 
@@ -489,7 +489,7 @@ cron は最小限の `PATH` で起動するため、`node` が `/usr/bin` にな
 {"source": "aave-u-eth", "host": "…", "chain": "base", "time": "…", "block": "53272934", "findings": [...], "new": ["premium_open:base"], "resolved": []}
 ```
 
-`host` はマシンのホスト名です。`resolved` に `aave_frozen:<chain>` が現れた場合は、そのチェーンの Aave の凍結が解除されたことを意味します。ボットは Webhook のレスポンスを待たないため（タイムアウト 10 秒）、取引判定の速度が低下することはありません。
+`host` はマシンのホスト名です。`resolved` に `aave_frozen:<chain>` が現れた場合は、そのチェーンで再び借入できるようになった（WETH の凍結解除、かつ LTV が 0 より大きいステーブルコインがある）ことを意味します。ボットは Webhook のレスポンスを待たないため（タイムアウト 10 秒）、取引判定の速度が低下することはありません。
 
 ### Webhook の設定 (set-alerts.sh)
 

@@ -480,7 +480,7 @@ cron은 기본 `PATH`가 짧으므로 `node`가 `/usr/bin`에 없는 경우(예:
 | `trader_crashloop` | critical | `trader.sh` 아래의 봇이 시작 후 5분 이내 종료를 3회 연속 반복했고 마지막 종료가 최근 15분 이내일 때 (예: 1Password에서 키를 읽지 못하는 경우) |
 | `rpc_error:<chain>` | warning | 해당 체인의 상태를 읽을 수 없을 때 (`check`에서만 발생) |
 | `position_open:<chain>` | info | 포지션이 열려 있을 때 |
-| `aave_frozen:<chain>` | info | 해당 체인의 Aave V3 WETH가 동결 상태일 때 |
+| `aave_frozen:<chain>` | info | 해당 체인에서 대출 불가: Aave V3 WETH가 동결 상태이거나, 담보로 쓸 수 있는 스테이블코인이 없음(동결 또는 LTV 0) |
 
 ### 정기 상태 점검
 
@@ -503,7 +503,7 @@ cron은 기본 `PATH`가 짧으므로 `node`가 `/usr/bin`에 없는 경우(예:
 {"source": "aave-u-eth", "host": "…", "chain": "base", "time": "…", "block": "53272934", "findings": [...], "new": ["premium_open:base"], "resolved": []}
 ```
 
-`host`는 머신의 호스트네임입니다. `resolved`에 `aave_frozen:<chain>`이 나타나면 해당 체인의 Aave 동결이 해제되었음을 뜻합니다. 봇은 웹훅 응답을 기다리지 않으므로(타임아웃 10 s) 거래 의사결정 속도에 전혀 영향을 주지 않습니다.
+`host`는 머신의 호스트네임입니다. `resolved`에 `aave_frozen:<chain>`이 나타나면 해당 체인에서 다시 대출할 수 있게 되었음(WETH 동결 해제, LTV가 0보다 큰 스테이블코인 존재)을 뜻합니다. 봇은 웹훅 응답을 기다리지 않으므로(타임아웃 10 s) 거래 의사결정 속도에 전혀 영향을 주지 않습니다.
 
 ### 웹훅 설정 (set-alerts.sh)
 

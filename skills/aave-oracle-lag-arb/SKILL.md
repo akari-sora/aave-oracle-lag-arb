@@ -88,7 +88,7 @@ Finding codes (`<code>:<chain>`, chain is mainnet / arbitrum / base / optimism):
 | `hf_low` | health factor below `EMERGENCY_HF` | urgent: liquidation risk; attach `trader.sh status` |
 | `bot_not_running` | opportunity or position, but no heartbeat for a minute | run `trader.sh ensure`, report the result |
 | `position_open` | a position is open | it disappearing means the bot closed it |
-| `aave_frozen` | Aave froze WETH on that chain | it in `resolved` means unfrozen; the bot deposits pending principal itself |
+| `aave_frozen` | can't borrow on that chain: WETH frozen, or no stablecoin usable as collateral (LTV 0) | it in `resolved` means borrowable again; the bot deposits pending principal itself |
 | `action_failing` | several actions in a row failed | attach `trader.sh status` |
 | `gas_low` | position open but little ETH for gas | ask the user to send ETH on that chain |
 | `rpc_error` | couldn't read that chain | |

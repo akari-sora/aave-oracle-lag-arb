@@ -480,7 +480,7 @@ Cron starts with a short `PATH`; if `node` isn't in `/usr/bin` (installed with n
 | `trader_crashloop` | critical | The bot under `trader.sh` exited within 5 minutes of starting 3 times in a row, the latest within 15 minutes (for example, 1Password can't read the key) |
 | `rpc_error:<chain>` | warning | Couldn't read this chain (only from `check`) |
 | `position_open:<chain>` | info | A position is open |
-| `aave_frozen:<chain>` | info | Aave V3 WETH is frozen on this chain |
+| `aave_frozen:<chain>` | info | Can't borrow on this chain: Aave V3 WETH is frozen, or no stablecoin can be collateral (frozen or LTV 0) |
 
 ### Scheduled check
 
@@ -503,7 +503,7 @@ it POSTs once whenever a chain's list changes (the first round only if there is 
 {"source": "aave-u-eth", "host": "…", "chain": "base", "time": "…", "block": "53272934", "findings": [...], "new": ["premium_open:base"], "resolved": []}
 ```
 
-`host` is the machine's hostname. `aave_frozen:<chain>` showing up in `resolved` means Aave on that chain has unfrozen. The bot doesn't wait for the webhook's response (10 s timeout), so it never slows down trading decisions.
+`host` is the machine's hostname. `aave_frozen:<chain>` showing up in `resolved` means that chain can be borrowed against again (WETH unfrozen and a stablecoin with LTV above 0). The bot doesn't wait for the webhook's response (10 s timeout), so it never slows down trading decisions.
 
 ### Setting the webhook (set-alerts.sh)
 
