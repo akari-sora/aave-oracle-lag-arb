@@ -416,7 +416,9 @@ GitHub 鏡像建好之後，也可以用 `hermes skills install` 從那裡裝（
 
 ### Grok Bot
 
-見 [integrations/grok-bot.md](integrations/grok-bot.md)。簡單說：用那份檔案裡的 persona 建一個 bot，它會把機器人裝在 Grok Bot 的電腦上，
+最快：打開範本 [https://x.ai/bot/4OryWRBkWbghpXyZytSSm](https://x.ai/bot/4OryWRBkWbghpXyZytSSm)，按 **Add to Grok Bot**。拿到的是你自己的一份 bot，錢包的秘密、例行任務和電腦都只屬於你。
+接著跟它說「set up」和「set wallet」。細節和 persona（要自己建的話）在 [integrations/grok-bot.md](integrations/grok-bot.md)。
+它會把機器人裝在 Grok Bot 的電腦上，
 用遮罩的秘密卡片收 key，例行任務每 6 小時跑 `ensure` 和 `check`。另外建一個 webhook 觸發的例行任務，再用 `set-alerts.sh` 接上，就能收即時警示。
 
 同一個 Grok 帳號的所有 bot 共用這台電腦（[官方](https://docs.x.ai/grok-bot/security-faq)：「Treat a login or file on the computer as available to every Bot that user runs」）。

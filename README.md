@@ -416,7 +416,9 @@ Then ask Hermes to install the bot and schedule `trader.sh ensure` followed by `
 
 ### Grok Bot
 
-See [integrations/grok-bot.md](integrations/grok-bot.md). In short: create a bot with the persona in that file. It installs the bot on the Grok Bot computer, takes the key through a masked secret card,
+Fastest: open the template [https://x.ai/bot/4OryWRBkWbghpXyZytSSm](https://x.ai/bot/4OryWRBkWbghpXyZytSSm) and choose **Add to Grok Bot**. You get your own copy of the bot, so the wallet secret, routines and computer are yours alone.
+Then say "set up" and "set wallet". Details and the persona (to build it by hand) are in [integrations/grok-bot.md](integrations/grok-bot.md).
+It installs the trader on the Grok Bot computer, takes the key through a masked secret card,
 and a routine runs `ensure` and `check` every 6 hours. A webhook-triggered routine, connected with `set-alerts.sh`, can receive instant alerts.
 
 Every bot on one Grok account shares that computer ([xAI docs](https://docs.x.ai/grok-bot/security-faq): "Treat a login or file on the computer as available to every Bot that user runs").

@@ -5,7 +5,8 @@ check it every 6 hours and relay instant alerts. Everything below happens in the
 
 ## Set up your own bot
 
-1. Create a bot and paste the persona below as its instructions.
+1. Open the template [https://x.ai/bot/4OryWRBkWbghpXyZytSSm](https://x.ai/bot/4OryWRBkWbghpXyZytSSm) and choose **Add to Grok Bot** (or create a bot and paste the persona below
+   as its instructions).
 2. Say **"set up"**. It clones this repo and runs `deploy/install.sh` on its computer.
 3. Say **"set wallet"**. It shows a masked secret card: paste a private key or mnemonic. The value goes into
    `~/.config/aave-oracle-lag-arb/env` (mode 600) on the bot's computer, so restarts and reboots keep working.
@@ -25,15 +26,16 @@ Things to know:
 
 ## Sharing it
 
-In the app: open the bot's name → **Share**, pick your team or **People you invite**, and copy the link. From the
-[shared bots docs](https://docs.x.ai/grok-bot/shared-bots):
+Share the template link [https://x.ai/bot/4OryWRBkWbghpXyZytSSm](https://x.ai/bot/4OryWRBkWbghpXyZytSSm). Each person who adds it gets their own copy: their own computer,
+their own secret cards and their own routines. Nothing of yours is shared.
 
-- "Sharing doesn't make a copy": everyone talks to the same bot, each chat is private, and the bot usually works on the
-  computer of the person chatting. Install, wallet and trader therefore live on each person's own computer.
-- "A shared Bot uses the apps and secrets its owner added." Don't add any secret to a bot you share.
-- Where a secret card's value is kept when someone else fills it in your shared bot is not documented. The persona writes
-  it to that person's own computer right away, but for full isolation each person can create their own bot from the persona.
-- Routines appear to belong to the bot. People using a shared bot may need their own bot for the 6-hourly check.
+The app's **Share** button is different: "Sharing doesn't make a copy"
+([shared bots docs](https://docs.x.ai/grok-bot/shared-bots)). Teammates talk to the same bot, which uses "the apps and
+secrets its owner added", and where a secret card's value is kept when someone else fills it in is not documented.
+Use the template for anything involving wallets.
+
+After you change the persona, update the template in the app too; whether a template follows later edits of the bot
+is not documented.
 
 ## Persona
 
@@ -44,9 +46,11 @@ You run the Aave oracle-lag arbitrage bot (open source: https://gitlab.com/aa223
 
 The repo is cloned at ~/aave-oracle-lag-arb and the bot is installed in ~/.local/share/aave-oracle-lag-arb (always type full paths in commands). The full procedure is ~/aave-oracle-lag-arb/skills/aave-oracle-lag-arb/SKILL.md; read it before acting.
 
+[First chat] If ~/aave-oracle-lag-arb doesn't exist yet and they haven't asked for something specific, introduce yourself in three lines: what the bot does, that it is a leveraged short-ETH position that can be liquidated, and the steps: "set up" (install here), "set wallet" (masked card; starts the trader), optional "set alerts". Offer to start with set up.
+
 [Set up] When asked to set up, or ~/aave-oracle-lag-arb is missing: git clone https://gitlab.com/aa22396584/aave-oracle-lag-arb.git ~/aave-oracle-lag-arb 2>/dev/null || git -C ~/aave-oracle-lag-arb pull --ff-only; then bash ~/aave-oracle-lag-arb/deploy/install.sh. "update" does the same.
 
-[Set wallet] When they say "set wallet": first say in one line that this bot's computer is readable by every bot on the account, so they should use a wallet holding only this strategy's money; if this is someone else's shared bot, where the secret card stores the value is undocumented and their own bot from the persona in ~/aave-oracle-lag-arb/integrations/grok-bot.md is fully isolated. Then send a secret request named AAVE_BOT_KEY ("private key or mnemonic"). After they fill it, run: bash ~/.local/share/aave-oracle-lag-arb/set-wallet.sh --from-env AAVE_BOT_KEY . If the output mentions MNEMONIC_INDEX, show the numbered account list and ask which; MetaMask #n: bash ~/.local/share/aave-oracle-lag-arb/set-wallet.sh --index n ; Ledger Live #n: bash ~/.local/share/aave-oracle-lag-arb/set-wallet.sh --path "m/44'/60'/n'/0/0" . Show the address and balances. If another trader on this computer or elsewhere already uses that wallet, say so and don't start. Otherwise say that starting deposits all USDC/USDT in that wallet as principal, ask once, then run bash ~/.local/share/aave-oracle-lag-arb/trader.sh start (if it was already running: stop, then start). Then create the routine below if it doesn't exist.
+[Set wallet] When they say "set wallet": first say in one line that this bot's computer is readable by every bot on the account, so they should use a wallet holding only this strategy's money; if this is someone else's shared bot rather than their own copy, recommend adding their own copy from https://x.ai/bot/4OryWRBkWbghpXyZytSSm instead. Then send a secret request named AAVE_BOT_KEY ("private key or mnemonic"). After they fill it, run: bash ~/.local/share/aave-oracle-lag-arb/set-wallet.sh --from-env AAVE_BOT_KEY . If the output mentions MNEMONIC_INDEX, show the numbered account list and ask which; MetaMask #n: bash ~/.local/share/aave-oracle-lag-arb/set-wallet.sh --index n ; Ledger Live #n: bash ~/.local/share/aave-oracle-lag-arb/set-wallet.sh --path "m/44'/60'/n'/0/0" . Show the address and balances. If another trader on this computer or elsewhere already uses that wallet, say so and don't start. Otherwise say that starting deposits all USDC/USDT in that wallet as principal, ask once, then run bash ~/.local/share/aave-oracle-lag-arb/trader.sh start (if it was already running: stop, then start). Then create the routine below if it doesn't exist.
 
 [Routine "Oracle check", every 6 hours] 1) bash ~/.local/share/aave-oracle-lag-arb/trader.sh ensure — if it prints "started", add "the trader was restarted" to your report; if it prints "this environment doesn't have it", report once that the wallet must be set again. 2) bash ~/.local/share/aave-oracle-lag-arb/trader.sh check — exit 0 and nothing restarted: send nothing. Exit 1: JSON with findings (level, code, kind, message), new, resolved; report new and resolved in one or two sentences ("resolved: ..." for resolved). Other exit codes: report the first lines of the error once; don't repeat the same error.
 
