@@ -269,6 +269,7 @@ ssh host ~/.local/share/aave-oracle-lag-arb/trader.sh start     # keeps running 
 - `npm ci` を実行した後、esbuild で `bot/` を単一ファイル `bot/dist/aave-oracle-lag-arb.mjs` にバンドルします（実行時に `node_modules` は不要です）。実行前に `bot/node_modules` が存在しなかった場合は、バンドル後に削除します（小規模環境での inode 枯渇を防ぐため）。
 - バンドルファイル、`bot/OracleLagArb.json`、`trader.sh`、`set-wallet.sh`、`set-alerts.sh` を `APP_DIR` にコピーします。
 - `--with-op` を指定すると、1Password CLI も `APP_DIR` にインストールします（Linux x64/arm64 のみ。解凍に `python3` が必要です）。
+- `--bundle-node` を指定すると、固定バージョンの Node を常に `APP_DIR` に置きます。再起動でシステムの Node が消えるマシン（Grok Bot のコンピュータなど）向けです。
 - ボットが稼働中であれば再起動し、そうでなければ次の手順を表示します。
 
 実行には `bash`、`git`、`curl` が必要です。Node を自動ダウンロードする場合は `sha256sum` と `.tar.xz` を展開できる `tar` も必要になります。

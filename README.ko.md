@@ -278,6 +278,7 @@ ssh host ~/.local/share/aave-oracle-lag-arb/trader.sh start     # keeps running 
 - `npm ci`를 실행한 후 esbuild를 사용해 `bot/`을 `node_modules` 없이 단독 실행되는 단일 파일 `bot/dist/aave-oracle-lag-arb.mjs`로 번들링합니다. 이전에 `bot/node_modules`가 없었다면 번들링 후 삭제합니다(소형 서버의 inode 부족 방지).
 - 번들 파일, `bot/OracleLagArb.json`, `trader.sh`, `set-wallet.sh`, `set-alerts.sh`를 `APP_DIR`에 복사합니다.
 - `--with-op` 옵션을 주면 1Password CLI도 `APP_DIR`에 함께 설치합니다(Linux x64/arm64 전용; 압축 해제를 위해 `python3` 필요).
+- `--bundle-node` 옵션을 주면 고정 버전의 Node를 항상 `APP_DIR`에 둡니다. 재부팅하면 시스템 Node가 사라지는 머신(예: Grok Bot 컴퓨터)용입니다.
 - 봇이 이미 실행 중이면 재시작하고, 아니면 다음 단계 안내를 출력합니다.
 
 필수 도구는 `bash`, `git`, `curl`이며, Node 다운로드가 필요한 경우 `sha256sum`과 `.tar.xz`를 지원하는 `tar`가 추가로 필요합니다.

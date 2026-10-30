@@ -25,7 +25,7 @@ or add `BOT_LANG=en` to the env file for English output (finding codes are the s
 
 ```bash
 git clone https://gitlab.com/aa22396584/aave-oracle-lag-arb.git ~/aave-oracle-lag-arb 2>/dev/null || git -C ~/aave-oracle-lag-arb pull --ff-only
-bash ~/aave-oracle-lag-arb/deploy/install.sh        # add --with-op for 1Password; restarts the bot if it runs
+bash ~/aave-oracle-lag-arb/deploy/install.sh        # --with-op: 1Password; --bundle-node: keep Node in APP (machines that lose /usr/bin/node on reboot); restarts the bot if it runs
 ```
 
 Needs Linux (the supervisor uses `setsid` and `/proc`), git, curl, and Node 20+ or Linux x64/arm64 for the pinned Node 22 download.

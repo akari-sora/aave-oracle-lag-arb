@@ -278,6 +278,7 @@ ssh host ~/.local/share/aave-oracle-lag-arb/trader.sh start     # keeps running 
 - Runs `npm ci`, then bundles `bot/` with esbuild into one file, `bot/dist/aave-oracle-lag-arb.mjs`, which runs without `node_modules`. If `bot/node_modules` didn't exist before, it is deleted afterwards (small machines run short of inodes).
 - Copies the bundle, `bot/OracleLagArb.json`, `trader.sh`, `set-wallet.sh` and `set-alerts.sh` into `APP_DIR`.
 - `--with-op` also installs the 1Password CLI into `APP_DIR` (Linux x64/arm64 only; needs `python3` to unzip).
+- `--bundle-node` always keeps the pinned Node in `APP_DIR`, for machines whose system Node disappears on reboot (for example a Grok Bot computer).
 - Restarts the bot if it is running; otherwise prints the next steps.
 
 You need `bash`, `git` and `curl`; for the Node download also `sha256sum` and a `tar` that handles `.tar.xz`.

@@ -278,6 +278,7 @@ ssh host ~/.local/share/aave-oracle-lag-arb/trader.sh start     # 在背景跑�
 - `npm ci` 之後用 esbuild 把 `bot/` 打包成單一檔 `bot/dist/aave-oracle-lag-arb.mjs`，執行時不用 `node_modules`。原本沒有 `bot/node_modules` 的話，打包完會刪掉（小機器的 inode 比較緊）
 - 把打包檔、`bot/OracleLagArb.json`、`trader.sh`、`set-wallet.sh`、`set-alerts.sh` 複製進 `APP_DIR`
 - `--with-op`：把 1Password CLI 裝進 `APP_DIR`（只限 Linux x64／arm64，要有 `python3` 解壓縮）
+- `--bundle-node`：一定把固定版本的 Node 放進 `APP_DIR`，給重開機會丟掉系統 Node 的機器用（例如 Grok Bot 的電腦）
 - 機器人在跑的話會重啟；沒在跑就印出下一步
 
 需要 `bash`、`git`、`curl`；要下載 Node 時還要 `sha256sum` 和能解 `.tar.xz` 的 `tar`。
