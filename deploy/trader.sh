@@ -119,7 +119,7 @@ case "${1:-}" in
   status)
     if running; then echo "running (pid $(cat "${PID_FILE}"), $(cat "${MODE_FILE}" 2>/dev/null || echo normal) mode)"; else echo "not running$([ -f "${STOP_FILE}" ] && echo " (stopped with trader.sh stop)")"; fi
     [ -f "${STATUS_FILE}" ] && echo "last exit: $(cat "${STATUS_FILE}")"
-    [ -f "${LOG}" ] && tail -n 8 "${LOG}"
+    if [ -f "${LOG}" ]; then tail -n 8 "${LOG}"; fi
     ;;
   logs)
     tail -n 50 -f "${LOG}"

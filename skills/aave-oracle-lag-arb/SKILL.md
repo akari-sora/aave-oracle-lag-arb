@@ -45,6 +45,9 @@ Never ask for a private key or mnemonic in ordinary chat. Use one of these:
 If the output mentions `MNEMONIC_INDEX`, the key is a mnemonic: show the user the numbered account list, ask which
 one, then run `"$APP/set-wallet.sh" --index <n>` for MetaMask #n, or `--path "m/44'/60'/<n>'/0/0"` for Ledger Live #n.
 
+One wallet, one running trader: two traders on the same wallet (on one machine or several) find the same contract and race each other's
+transactions. If another install already trades this wallet, stop there and tell the user.
+
 Show the address and balances and ask once before starting. Starting deposits **all** USDC/USDT in that wallet as
 principal on every chain where Aave accepts it; ETH stays in the wallet for gas.
 
@@ -70,6 +73,8 @@ Run `stop`, `close-only` or `exit` only when the user asks:
 - `ensure` printing `started` means the bot had died or the machine rebooted: mention it.
 - `ensure` printing `this environment doesn't have it`: the wallet was stored by variable name only and the variable is gone;
   ask the user to set the wallet again.
+- The first `check` only records a baseline: it counts as changed only if there is a warning or critical finding
+  (info codes like `aave_frozen` alone give exit 0).
 - `check` exit 0 and nothing restarted: stay silent. Exit 1: summarize `new` and `resolved` in one or two sentences.
   Other exit codes: report the first lines of the error once, not every time.
 
