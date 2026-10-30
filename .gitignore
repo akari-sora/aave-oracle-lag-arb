@@ -1,0 +1,12 @@
+out/
+cache/
+broadcast/
+.env
+bot/.env
+bot/node_modules/
+bot/dist/
+bot/state.json
+bot/heartbeat-*.json
+bot/check-state.json
+bot/trader-status.json
+.DS_Store
