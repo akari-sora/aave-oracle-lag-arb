@@ -48,7 +48,8 @@ one, then run `"$APP/set-wallet.sh" --index <n>` for MetaMask #n, or `--path "m/
 One wallet, one running trader: two traders on the same wallet (on one machine or several) find the same contract and race each other's
 transactions. If another install already trades this wallet, stop there and tell the user.
 
-Show the address and balances and ask once before starting. Starting deposits **all** USDC/USDT in that wallet as
+Show the address and balances and ask once before starting. The first time, also point the user to `DISCLAIMER.md` in the repo
+(unaudited, leveraged short ETH, may lose everything) in one line. Starting deposits **all** USDC/USDT in that wallet as
 principal on every chain where Aave accepts it; ETH stays in the wallet for gas.
 
 ## Run

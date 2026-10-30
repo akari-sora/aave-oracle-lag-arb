@@ -13,7 +13,7 @@ Canonical repo, issues and releases: https://gitlab.com/aa22396584/aave-oracle-l
 - A Linux supervisor and setup scripts run it around the clock, with a health check and webhook alerts.
 - An agent skill lets Claude Code, Codex, Hermes Agent, Grok Bot or any other agent install and watch it for you.
 
-**Risk: this is a leveraged short-ETH position, not risk-free arbitrage. If ETH rises far enough, the position is liquidated. Aave can freeze markets at any time.**
+**Risk: this is a leveraged short-ETH position, not risk-free arbitrage. If ETH rises far enough, the position is liquidated. Aave can freeze markets at any time. Read the [disclaimer](DISCLAIMER.md) before using it.**
 
 ![Rehearsal on an Ethereum mainnet fork](docs/demo.gif)
 
@@ -701,4 +701,4 @@ KyberSwap quotes and execution in a real event; a real premium on Aerodrome/Velo
 AGPL-3.0-only, see [LICENSE](LICENSE). You may use, change and share it; if you distribute a modified version, or run one
 for others over a network, you must offer its source under the same license.
 
-Not financial advice. Use at your own risk. Audit the contract and the bot yourself before using them with real funds.
+Not financial advice. Use at your own risk; the software is unaudited. Full [disclaimer](DISCLAIMER.md).

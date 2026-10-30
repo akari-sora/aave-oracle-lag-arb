@@ -13,7 +13,7 @@ Uniswap 上的 ETH 比 Aave 的 Chainlink 預言機貴很多時，用預言機�
 - Linux 上 24 小時跑的監管程式和設定腳本，加上健康檢查和 webhook 警示
 - 一份 agent skill，讓 Claude Code、Codex、Hermes Agent、Grok Bot 或其他 agent 幫你安裝、顧著它
 
-**風險：這是加了槓桿的 ETH 空單，不是無風險套利。ETH 漲太多會被清算；Aave 隨時可能凍結市場。**
+**風險：這是加了槓桿的 ETH 空單，不是無風險套利。ETH 漲太多會被清算；Aave 隨時可能凍結市場。使用前請先讀[免責聲明](DISCLAIMER.md#免責聲明)。**
 
 ![主網 fork 演練](docs/demo.gif)
 
@@ -700,4 +700,4 @@ Uniswap USDC 0.05% 推到 +10.09% → 滿 15 秒後分兩筆開倉（73.02 + 5.6
 
 AGPL-3.0-only，見 [LICENSE](LICENSE)。可以使用、修改、分享；散布修改後的版本，或透過網路提供給別人使用時，要用同一個授權公開原始碼。
 
-這不是投資建議，使用風險自負。放真的錢之前，請自己審過合約和程式。
+這不是投資建議，使用風險自負；軟體沒有經過審計。完整內容見[免責聲明](DISCLAIMER.md#免責聲明)。
