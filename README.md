@@ -688,6 +688,7 @@ KyberSwap quotes and execution in a real event; a real premium on Aerodrome/Velo
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+AGPL-3.0-only, see [LICENSE](LICENSE). You may use, change and share it; if you distribute a modified version, or run one
+for others over a network, you must offer its source under the same license.
 
 Not financial advice. Use at your own risk. Audit the contract and the bot yourself before using them with real funds.

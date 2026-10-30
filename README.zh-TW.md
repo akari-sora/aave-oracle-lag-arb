@@ -688,6 +688,6 @@ cast call $ARB "premiumBps(address)(int256)" <pool>
 
 ## 授權
 
-MIT，見 [LICENSE](LICENSE)。
+AGPL-3.0-only，見 [LICENSE](LICENSE)。可以使用、修改、分享；散布修改後的版本，或透過網路提供給別人使用時，要用同一個授權公開原始碼。
 
 這不是投資建議，使用風險自負。放真的錢之前，請自己審過合約和程式。

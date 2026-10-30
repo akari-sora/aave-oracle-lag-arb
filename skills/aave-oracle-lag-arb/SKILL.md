@@ -1,7 +1,7 @@
 ---
 name: aave-oracle-lag-arb
 description: Install, run and watch the Aave oracle-lag arbitrage bot (borrow WETH on Aave V3 at the Chainlink price, sell it on a DEX trading above the oracle, buy back after convergence) on Ethereum, Arbitrum, Base and Optimism. Use when the user wants to set up or operate the bot, set its wallet or alert webhook, schedule its health check, read its findings, or unwind and withdraw.
-license: MIT
+license: AGPL-3.0-only
 metadata:
   repo: https://gitlab.com/aa22396584/aave-oracle-lag-arb
 ---
