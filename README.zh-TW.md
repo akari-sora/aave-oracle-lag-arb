@@ -2,7 +2,7 @@
 
 Uniswap 上的 ETH 比 Aave 的 Chainlink 預言機貴很多時，用預言機價跟 Aave 借 WETH、拿到 DEX 賣掉，等價差收斂再買回來還債。
 
-[English](README.md)
+[English](README.md) · 繁體中文 · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
 正式的 repo、issue 和 release：https://gitlab.com/aa22396584/aave-oracle-lag-arb
 
@@ -483,7 +483,7 @@ cron 的 PATH 很短；`node` 不在 `/usr/bin` 的話（例如用 nvm 裝的）
 
 ### 排程查詢
 
-`node start.ts check --json` 印出發現清單，有 warning／critical 時結束碼 1。訊息是繁體中文：
+`node start.ts check --json` 印出發現清單，有 warning／critical 時結束碼 1。訊息預設是繁體中文（設 `BOT_LANG=en` 換成英文）：
 
 ```json
 [{"level": "warning", "code": "premium_open:mainnet", "kind": "condition", "message": "Ethereum Uniswap USDC 0.05% 的 ETH 比 Aave 預言機貴 +9.73%"}]
@@ -557,6 +557,7 @@ $APP/set-alerts.sh --off                                                 # 拿�
 | `LOG_MS` | 30000 | 沒事的時候多久印一行 |
 | `MNEMONIC_INDEX` / `MNEMONIC_PATH` | — | 助記詞直接指定地址，不掃 |
 | `ARB_ADDRESS_<鏈>` | `state.json` | 指定合約地址 |
+| `BOT_LANG` | — | `en` = 訊息用英文；其他 = 繁體中文 |
 
 ## 測試
 

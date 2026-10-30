@@ -30,7 +30,8 @@ bash -n deploy/*.sh
 
 ## Conventions
 
-- User-facing CLI messages and code comments are Traditional Chinese; keep new ones consistent with the file you are in.
+- User-facing messages go through `tr(zh, en)` from `bot/i18n.ts`; write both languages (Traditional Chinese default,
+  English with `BOT_LANG=en`). Don't call `tr` at module top level. Code comments are Traditional Chinese.
 - Keys never go on a command line, into logs, or into files other than the 600 env file written by `set-wallet.sh`.
 - Every on-chain action is simulated first; the contract enforces price limits against the Aave oracle on-chain, so keep
   slippage protection in the contract, not only in the bot.

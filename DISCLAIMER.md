@@ -1,6 +1,6 @@
 # Disclaimer
 
-[繁體中文](#免責聲明)
+[繁體中文](#免責聲明) · [简体中文](DISCLAIMER.zh-CN.md) · [日本語](DISCLAIMER.ja.md) · [한국어](DISCLAIMER.ko.md)
 
 **This software is for education and research. It is not financial, investment, legal or tax advice, and nothing in this
 repository is an offer or a recommendation to trade. Use it at your own risk, and only with money you can afford to lose
@@ -37,7 +37,7 @@ By using this software you accept these terms.
 
 # 免責聲明
 
-[English](#disclaimer)
+[English](#disclaimer) · [简体中文](DISCLAIMER.zh-CN.md) · [日本語](DISCLAIMER.ja.md) · [한국어](DISCLAIMER.ko.md)
 
 **這個軟體用於教育和研究，不構成任何金融、投資、法律或稅務建議，本 repo 的任何內容也都不是交易的邀約或推薦。
 使用風險自負，只用你輸得起、全部賠光也能接受的錢。**

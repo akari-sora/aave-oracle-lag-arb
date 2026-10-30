@@ -20,6 +20,7 @@ import {
   type PublicClient,
 } from "viem";
 import { arbitrum, base, mainnet, optimism } from "viem/chains";
+import { tr } from "./i18n.ts";
 
 // bot/.env 有的話先讀進來（已經在環境變數裡的不會被蓋掉）
 try {
@@ -66,9 +67,17 @@ export const CFG = {
 
 /// TARGET_HF 低於「清算門檻 ÷ LTV」（USDC 約 0.78 ÷ 0.75 = 1.04）時，Aave 借款會被 LTV 擋下，開倉永遠失敗
 export function checkConfig() {
-  if (CFG.targetHf < 105n * 10n ** 16n) throw new Error(`TARGET_HF 至少要 1.05（現在 ${formatUnits(CFG.targetHf, 18)}）`);
-  if (CFG.emergencyHf >= CFG.targetHf) throw new Error("EMERGENCY_HF 要比 TARGET_HF 低");
-  if (CFG.emergencyTargetHf <= CFG.emergencyHf) throw new Error("EMERGENCY_TARGET_HF 要比 EMERGENCY_HF 高（不然降槓桿永遠到不了目標）");
+  const hf = formatUnits(CFG.targetHf, 18);
+  if (CFG.targetHf < 105n * 10n ** 16n) throw new Error(tr(`TARGET_HF 至少要 1.05（現在 ${hf}）`, `TARGET_HF must be at least 1.05 (now ${hf})`));
+  if (CFG.emergencyHf >= CFG.targetHf) throw new Error(tr("EMERGENCY_HF 要比 TARGET_HF 低", "EMERGENCY_HF must be lower than TARGET_HF"));
+  if (CFG.emergencyTargetHf <= CFG.emergencyHf) {
+    throw new Error(
+      tr(
+        "EMERGENCY_TARGET_HF 要比 EMERGENCY_HF 高（不然降槓桿永遠到不了目標）",
+        "EMERGENCY_TARGET_HF must be higher than EMERGENCY_HF (otherwise deleveraging never reaches the target)",
+      ),
+    );
+  }
 }
 
 // ───────────────────────────── 鏈 ─────────────────────────────
@@ -262,7 +271,7 @@ export const ts = () => new Date().toISOString().slice(11, 19);
 export const errMsg = (e: unknown) => {
   const base = ((e as { shortMessage?: string }).shortMessage ?? (e as Error).message.split("\n")[0]).replace(/\s*\n\s*/g, " ");
   for (let c: any = e; c; c = c.cause) {
-    if (c.data?.errorName) return `${base}（${c.data.errorName}）`;
+    if (c.data?.errorName) return tr(`${base}（${c.data.errorName}）`, `${base} (${c.data.errorName})`);
   }
   return base;
 };
@@ -288,7 +297,9 @@ export const stableName = (ctx: Ctx, a: Address) =>
 export async function loadCtx(chain: ChainCfg): Promise<Ctx> {
   const client = clientFor(chain);
   const chainId = await client.getChainId();
-  if (chainId !== chain.chain.id) throw new Error(`${chain.name} 的 RPC 回 chain ${chainId}，應該是 ${chain.chain.id}`);
+  if (chainId !== chain.chain.id) {
+    throw new Error(tr(`${chain.name} 的 RPC 回 chain ${chainId}，應該是 ${chain.chain.id}`, `${chain.name} RPC returned chain ${chainId}, expected ${chain.chain.id}`));
+  }
   const [aavePool, oracle] = await Promise.all([
     client.readContract({ address: chain.aaveProvider, abi: providerAbi, functionName: "getPool" }),
     client.readContract({ address: chain.aaveProvider, abi: providerAbi, functionName: "getPriceOracle" }),
@@ -424,16 +435,19 @@ export const livePools = (m: Market) => m.quotes.filter((q) => q.poolWeth >= CFG
 
 export function describe(ctx: Ctx, m: Market, p?: Position) {
   const pools = livePools(m).map((q) => `${q.name} ${pct(q.premiumBps)}`).join(" | ");
-  const aave = m.wethFrozen ? "Aave 凍結中" : `WETH 可借 ${Number(formatUnits(m.wethBorrowable, 18)).toFixed(0)}`;
+  const borrowable = Number(formatUnits(m.wethBorrowable, 18)).toFixed(0);
+  const aave = m.wethFrozen ? tr("Aave 凍結中", "Aave frozen") : tr(`WETH 可借 ${borrowable}`, `WETH borrowable ${borrowable}`);
   let pos = "";
   if (p) {
     const coll = [...p.collateral]
       .filter(([, v]) => v > 0n)
       .map(([s, v]) => `${Number(formatUnits(v, ctx.decimals.get(s)!)).toFixed(0)} ${stableName(ctx, s)}`)
       .join("+");
-    pos = ` | 抵押 ${coll || "0"} 債 ${Number(formatUnits(p.debt, 18)).toFixed(3)} WETH HF ${fmtHf(p.hf)}`;
+    const debt = Number(formatUnits(p.debt, 18)).toFixed(3);
+    pos = tr(` | 抵押 ${coll || "0"} 債 ${debt} WETH HF ${fmtHf(p.hf)}`, ` | collateral ${coll || "0"} debt ${debt} WETH HF ${fmtHf(p.hf)}`);
   }
-  return `${ts()} [${ctx.chain.name}] #${m.block} 預言機 $${(Number(m.wethPrice) / 1e8).toFixed(2)} | ${pools} | ${aave}${pos}`;
+  const price = (Number(m.wethPrice) / 1e8).toFixed(2);
+  return tr(`${ts()} [${ctx.chain.name}] #${m.block} 預言機 $${price} | ${pools} | ${aave}${pos}`, `${ts()} [${ctx.chain.name}] #${m.block} oracle $${price} | ${pools} | ${aave}${pos}`);
 }
 
 // ───────────────────────────── 送交易 ─────────────────────────────
@@ -472,14 +486,19 @@ export class Sender {
   /// CLI 用：送出並等上鏈。私有交易池不會把失敗的交易上鏈，等不到就當作沒送成
   async sendAndWait(label: string, to: Address | undefined, data: Hex) {
     const { hash } = await this.send(to, data);
-    console.log(`  [${this.ctx.chain.name}] ${label}：送出 ${hash}`);
+    console.log(tr(`  [${this.ctx.chain.name}] ${label}：送出 ${hash}`, `  [${this.ctx.chain.name}] ${label}: sent ${hash}`));
     try {
       const r = await this.ctx.client.waitForTransactionReceipt({ hash, timeout: 180_000 });
-      if (r.status !== "success") throw new Error(`${label} 交易失敗（${hash}）`);
+      if (r.status !== "success") throw new Error(tr(`${label} 交易失敗（${hash}）`, `${label} transaction failed (${hash})`));
       return r;
     } catch (e) {
       if ((e as Error).name === "WaitForTransactionReceiptTimeoutError") {
-        throw new Error(`${label} 三分鐘內沒上鏈（${hash}）。用私有交易池時，會失敗的交易會被直接丟掉；可以稍後再跑一次`);
+        throw new Error(
+          tr(
+            `${label} 三分鐘內沒上鏈（${hash}）。用私有交易池時，會失敗的交易會被直接丟掉；可以稍後再跑一次`,
+            `${label} not mined within 3 minutes (${hash}). A private mempool drops transactions that would fail; you can run it again later`,
+          ),
+        );
       }
       throw e;
     }
@@ -626,6 +645,8 @@ export async function runBot(o: BotOptions) {
   };
   await checkAgg();
   const say = (s: string) => console.log(`  [${ctx.chain.name}] ${s}`);
+  // label 是內部用的 key（pending.label === "存本金"、note 的 kind），印出來時才翻
+  const tag = (label: string) => tr(label, ({ 開倉: "open", 平倉: "close", 緊急降槓桿: "deleverage", 存本金: "deposit" } as Record<string, string>)[label] ?? label);
   // 「凍結中不能開」「量太小不送」「模擬失敗」這類每個區塊都會成立的狀態，同一種每 LOG_MS 只印一次
   const lastNote = new Map<string, number>();
   const note = (kind: string, s: string) => {
@@ -637,7 +658,7 @@ export async function runBot(o: BotOptions) {
   const send = async (label: string, data: Hex, token?: Address) => {
     const { hash, nonce } = await o.sender!.send(o.arb, data);
     pending = { hash, nonce, label, block: lastBlock, token };
-    say(`送出 ${hash}`);
+    say(tr(`送出 ${hash}`, `sent ${hash}`));
   };
 
   const act = async (label: string, functionName: "open" | "close" | "openVia" | "closeVia", q: Quote, args: readonly unknown[]) => {
@@ -646,13 +667,20 @@ export async function runBot(o: BotOptions) {
       // open/close 回傳 (WETH, stable)；openVia 回傳換到的 stable；closeVia 回傳還了多少 WETH
       const [weth, stable] =
         functionName === "openVia" ? [args[1] as bigint, r as unknown as bigint] : functionName === "closeVia" ? [r as unknown as bigint, args[2] as bigint] : r;
+      const w = formatUnits(weth, 18);
       if (functionName === "open" && weth < CFG.minWethPerTx) {
-        note(`dust:${q.address}`, `[${label}] ${q.name} 只能再賣 ${formatUnits(weth, 18)} WETH，低於 MIN_WETH_PER_TX，不送`);
+        note(`dust:${q.address}`, tr(`[${label}] ${q.name} 只能再賣 ${w} WETH，低於 MIN_WETH_PER_TX，不送`, `[${tag(label)}] ${q.name} can only sell ${w} more WETH, below MIN_WETH_PER_TX, not sending`));
         return "skip";
       }
-      const verb = functionName.startsWith("open") ? ["賣", "收"] : ["買", "付"];
-      const via = functionName.endsWith("Via") ? "經聚合器 " : "";
-      say(`[${label}] ${via}${q.name} ${pct(q.premiumBps)}：${verb[0]} ${formatUnits(weth, 18)} WETH，${verb[1]} ${formatUnits(stable, q.stableDecimals)} ${q.stableName}`);
+      const isOpen = functionName.startsWith("open");
+      const isVia = functionName.endsWith("Via");
+      const s = formatUnits(stable, q.stableDecimals);
+      say(
+        tr(
+          `[${label}] ${isVia ? "經聚合器 " : ""}${q.name} ${pct(q.premiumBps)}：${isOpen ? "賣" : "買"} ${w} WETH，${isOpen ? "收" : "付"} ${s} ${q.stableName}`,
+          `[${tag(label)}] ${isVia ? "via aggregator " : ""}${q.name} ${pct(q.premiumBps)}: ${isOpen ? "sell" : "buy"} ${w} WETH, ${isOpen ? "receive" : "pay"} ${s} ${q.stableName}`,
+        ),
+      );
       if (!o.sender) return "sent";
       await send(label, encodeFunctionData({ abi: arbAbi, functionName, args: args as never }));
       actionFailures = 0;
@@ -661,11 +689,12 @@ export async function runBot(o: BotOptions) {
       const msg = errMsg(e);
       // 合約說「沒事可做」、「價格已經到上限沒空間」（買回把池子推到上限，要等別人把價格拉回來）不算失敗
       if (/NothingToDo|HealthFactorTooLow|NoEdge|PriceBelowLimit|PriceAboveLimit/.test(msg)) {
-        note(`skip:${label}:${functionName}:${q.address}`, `[${label}] ${q.name} 先不做：${msg.match(/NothingToDo|HealthFactorTooLow|NoEdge|PriceBelowLimit|PriceAboveLimit/)![0]}`);
+        const why = msg.match(/NothingToDo|HealthFactorTooLow|NoEdge|PriceBelowLimit|PriceAboveLimit/)![0];
+        note(`skip:${label}:${functionName}:${q.address}`, tr(`[${label}] ${q.name} 先不做：${why}`, `[${tag(label)}] ${q.name} skipped for now: ${why}`));
         return "skip";
       }
       actionFailures++;
-      note(`fail:${label}:${q.address}`, `[${label}] ${q.name} 沒送：${msg}`);
+      note(`fail:${label}:${q.address}`, tr(`[${label}] ${q.name} 沒送：${msg}`, `[${tag(label)}] ${q.name} not sent: ${msg}`));
       return "fail";
     }
   };
@@ -679,7 +708,7 @@ export async function runBot(o: BotOptions) {
     for (let i = 0; i < 3 && w >= CFG.minWethPerTx; i++, w /= 2n) {
       const route = await kyberRoute(k, ctx.chain.weth, q.stable, w, o.arb!);
       if (!route) {
-        note("agg", "聚合器沒有回應，改用單一池子");
+        note("agg", tr("聚合器沒有回應，改用單一池子", "aggregator did not respond, falling back to single pools"));
         return "skip";
       }
       const floor = stableFor(m, q.stable, q.stableDecimals, w, 10_000n + CFG.minEdgeBps);
@@ -694,7 +723,7 @@ export async function runBot(o: BotOptions) {
     if (!aggReady) return false;
     const plan = await planAggClose(ctx, m, p, o.arb!, maxPremium, maxWethOut);
     if (!plan) {
-      note(`aggclose:${label}`, `[${label}] 聚合器也找不到 ${pct(maxPremium)} 內的價格`);
+      note(`aggclose:${label}`, tr(`[${label}] 聚合器也找不到 ${pct(maxPremium)} 內的價格`, `[${tag(label)}] the aggregator has no price within ${pct(maxPremium)} either`));
       return false;
     }
     const q = m.quotes.find((x) => x.stable === plan.stable)!;
@@ -765,7 +794,10 @@ export async function runBot(o: BotOptions) {
     }
     alerts.update(m, p, o.sender ? true : botAlive(k), { actionFailures, gasLow });
     if (!o.arb || !p) return;
-    if (gasLow) note("gas", `錢包 ETH 只剩 ${formatUnits(eth!, 18)}，持倉中最好補到 ${formatUnits(gasFloor(k) * 2n, 18)} 以上`);
+    if (gasLow) {
+      const [left, want] = [formatUnits(eth!, 18), formatUnits(gasFloor(k) * 2n, 18)];
+      note("gas", tr(`錢包 ETH 只剩 ${left}，持倉中最好補到 ${want} 以上`, `wallet has only ${left} ETH left; with a position open, top it up to at least ${want}`));
+    }
 
     if (pending) {
       let r = await ctx.client.getTransactionReceipt({ hash: pending.hash }).catch(() => undefined);
@@ -783,14 +815,15 @@ export async function runBot(o: BotOptions) {
             .then((res) => res.json() as Promise<{ status?: string }>)
             .catch(() => ({ status: undefined }));
           // FAILED／CANCELLED 是確定的；UNKNOWN 可能只是狀態 API 還沒同步，多等幾個區塊才算
-          if (st.status === "FAILED" || st.status === "CANCELLED") dropped = `Flashbots 回 ${st.status}`;
-          else if (st.status === "UNKNOWN" && m.block >= pending.block + 5n) dropped = "Flashbots 5 個區塊都查不到";
+          if (st.status === "FAILED" || st.status === "CANCELLED") dropped = tr(`Flashbots 回 ${st.status}`, `Flashbots returned ${st.status}`);
+          else if (st.status === "UNKNOWN" && m.block >= pending.block + 5n) dropped = tr("Flashbots 5 個區塊都查不到", "Flashbots still has no record after 5 blocks");
         }
         const window = k === "mainnet" ? 10n : 25n * BigInt(blocksPerMainnetBlock(k));
-        if (!dropped && m.block > pending.block + window) dropped = "等太久沒上鏈";
+        if (!dropped && m.block > pending.block + window) dropped = tr("等太久沒上鏈", "not mined after waiting too long");
       }
       if (r) {
-        say(`[${pending.label}] ${r.status === "success" ? "成功" : "失敗"} @ #${r.blockNumber}，gas ${r.gasUsed}`);
+        const ok = r.status === "success";
+        say(tr(`[${pending.label}] ${ok ? "成功" : "失敗"} @ #${r.blockNumber}，gas ${r.gasUsed}`, `[${tag(pending.label)}] ${ok ? "success" : "failed"} @ #${r.blockNumber}, gas ${r.gasUsed}`));
         if (r.status !== "success") actionFailures++;
         if (pending.label === "存本金" && r.status === "success" && pending.token) {
           o.pendingDeposits = o.pendingDeposits?.filter((d) => d.token !== pending!.token);
@@ -798,10 +831,15 @@ export async function runBot(o: BotOptions) {
         }
         pending = undefined;
       } else if (unknownDone) {
-        say(`[${pending.label}] nonce 已經用掉但查不到收據，當作結束了，下個區塊照實際部位判斷`);
+        say(
+          tr(
+            `[${pending.label}] nonce 已經用掉但查不到收據，當作結束了，下個區塊照實際部位判斷`,
+            `[${tag(pending.label)}] nonce already used but no receipt found; treating it as done, the next block goes by the actual position`,
+          ),
+        );
         pending = undefined;
       } else if (dropped) {
-        say(`[${pending.label}] 沒上鏈（${dropped}），放行`);
+        say(tr(`[${pending.label}] 沒上鏈（${dropped}），放行`, `[${tag(pending.label)}] not mined (${dropped}), moving on`));
         actionFailures++;
         pending = undefined;
       } else return;
@@ -816,7 +854,8 @@ export async function runBot(o: BotOptions) {
         ]);
         const amount = [dep.amount, bal, allowance, m.stableRoom.get(dep.token)!].reduce((a, b) => (a < b ? a : b));
         if (amount === 0n) continue;
-        say(`[存本金] Aave 可以存了，存 ${formatUnits(amount, ctx.decimals.get(dep.token)!)} ${stableName(ctx, dep.token)}`);
+        const [amt, name] = [formatUnits(amount, ctx.decimals.get(dep.token)!), stableName(ctx, dep.token)];
+        say(tr(`[存本金] Aave 可以存了，存 ${amt} ${name}`, `[deposit] Aave accepts deposits now, depositing ${amt} ${name}`));
         await send("存本金", encodeFunctionData({ abi: arbAbi, functionName: "deposit", args: [dep.token, amount] }), dep.token);
         return;
       }
@@ -824,9 +863,22 @@ export async function runBot(o: BotOptions) {
 
     if (p.debt > 0n && p.hf < CFG.emergencyHf) {
       const w = emergencyBuyback(p, m.wethPrice, CFG.emergencyMaxPremiumBps, CFG.emergencyTargetHf);
-      say(`HF ${fmtHf(p.hf)} 低於 EMERGENCY_HF，${w === 0n ? "全部買回" : `買回 ${formatUnits(w, 18)} WETH 讓 HF 回到 ${formatUnits(CFG.emergencyTargetHf, 18)}`}`);
+      const [ww, target] = [formatUnits(w, 18), formatUnits(CFG.emergencyTargetHf, 18)];
+      say(
+        tr(
+          `HF ${fmtHf(p.hf)} 低於 EMERGENCY_HF，${w === 0n ? "全部買回" : `買回 ${ww} WETH 讓 HF 回到 ${target}`}`,
+          `HF ${fmtHf(p.hf)} below EMERGENCY_HF, ${w === 0n ? "buying back everything" : `buying back ${ww} WETH to bring HF back to ${target}`}`,
+        ),
+      );
       if (!(await closeCheapest(m, p, CFG.emergencyMaxPremiumBps, "緊急降槓桿", w)) && !(await aggClose(m, p, CFG.emergencyMaxPremiumBps, "緊急降槓桿", w))) {
-        note("emergency", `沒有池子能在 ${pct(CFG.emergencyMaxPremiumBps)} 內買回；把穩定幣直接轉進合約 ${o.arb} 可以讓它付得起，或用 repayFromOwner 直接拿 WETH 還`);
+        const max = pct(CFG.emergencyMaxPremiumBps);
+        note(
+          "emergency",
+          tr(
+            `沒有池子能在 ${max} 內買回；把穩定幣直接轉進合約 ${o.arb} 可以讓它付得起，或用 repayFromOwner 直接拿 WETH 還`,
+            `no pool can buy back within ${max}; send stablecoins straight to contract ${o.arb} so it can pay, or repay with WETH via repayFromOwner`,
+          ),
+        );
       }
       return;
     }
@@ -834,7 +886,11 @@ export async function runBot(o: BotOptions) {
     if (openable.length && !CFG.closeOnly) {
       const waited = (Date.now() - premiumSince!) / 1000;
       if (waited < CFG.confirmSeconds) {
-        note("confirm", `${openable[0].name} 溢價 ${pct(openable[0].premiumBps)}，已持續 ${waited.toFixed(0)} 秒，滿 ${CFG.confirmSeconds} 秒才開`);
+        const [name, prem, secs] = [openable[0].name, pct(openable[0].premiumBps), waited.toFixed(0)];
+        note(
+          "confirm",
+          tr(`${name} 溢價 ${prem}，已持續 ${secs} 秒，滿 ${CFG.confirmSeconds} 秒才開`, `${name} premium ${prem}, held for ${secs}s, opening once it reaches ${CFG.confirmSeconds}s`),
+        );
         return;
       }
       // 先問聚合器（每種穩定幣用它溢價最高的池子當代表），不夠好才用單一 Uniswap 池子
@@ -850,7 +906,13 @@ export async function runBot(o: BotOptions) {
         if (q.kind !== "uni") continue;
         const cap = openCap(m, q);
         if (cap < CFG.minWethPerTx) {
-          note(`cap:${q.address}`, `${q.name} 溢價 ${pct(q.premiumBps)}，但 Aave 可借的 WETH 或 ${q.stableName} 可存的額度不夠`);
+          note(
+            `cap:${q.address}`,
+            tr(
+              `${q.name} 溢價 ${pct(q.premiumBps)}，但 Aave 可借的 WETH 或 ${q.stableName} 可存的額度不夠`,
+              `${q.name} premium ${pct(q.premiumBps)}, but Aave doesn't have enough borrowable WETH or ${q.stableName} supply room`,
+            ),
+          );
           continue;
         }
         // 先用「溢價的一半」估規模（第一筆就開足），健康因子不夠的話合約會擋，再退回最保守的估法
@@ -861,7 +923,7 @@ export async function runBot(o: BotOptions) {
       }
       return; // 能用的池子價差還在：抱著，不平倉
     }
-    if (CFG.closeOnly && openable.length) note("closeOnly", "CLOSE_ONLY 模式：有溢價也不開倉");
+    if (CFG.closeOnly && openable.length) note("closeOnly", tr("CLOSE_ONLY 模式：有溢價也不開倉", "CLOSE_ONLY mode: not opening despite the premium"));
 
     if (p.debt > 0n && !(await closeCheapest(m, p, CFG.closePremiumBps, "平倉"))) {
       // 單一池子都平不了（例如都被推到價格上限）：價差已經收斂的話，問聚合器
@@ -877,7 +939,7 @@ export async function runBot(o: BotOptions) {
     try {
       await step(hint);
     } catch (e) {
-      console.error(`${ts()} [${ctx.chain.name}] 這個區塊出錯：${errMsg(e)}`);
+      console.error(tr(`${ts()} [${ctx.chain.name}] 這個區塊出錯：${errMsg(e)}`, `${ts()} [${ctx.chain.name}] error on this block: ${errMsg(e)}`));
     } finally {
       busy = false;
       // 心跳在判斷之後寫；只有能送交易的機器人才寫（只能看不能動的鏈，bot_not_running 還是要報）。寫失敗（例如磁碟滿）不影響交易
@@ -894,7 +956,7 @@ export async function runBot(o: BotOptions) {
     const ws = createPublicClient({ chain: ctx.chain.chain, transport: webSocket(ctx.chain.wsUrl, { reconnect: true, keepAlive: true }) });
     ws.watchBlockNumber({
       onBlockNumber: (n) => void tick(n),
-      onError: (e) => note("ws", `新區塊訂閱出錯（${errMsg(e)}），靠輪詢繼續`),
+      onError: (e) => note("ws", tr(`新區塊訂閱出錯（${errMsg(e)}），靠輪詢繼續`, `new-block subscription error (${errMsg(e)}), continuing with polling`)),
     });
   }
   await new Promise(() => {}); // 一直跑到 Ctrl+C
@@ -945,25 +1007,46 @@ export function findings(ctx: Ctx, m: Market, p: Position | undefined, alive: bo
       level: "warning",
       code: `premium_open:${k}`,
       kind: "condition",
-      message: `${n} Uniswap ${best.name} 的 ETH 比 Aave 預言機貴 ${pct(best.premiumBps)}${blocked ? "，但 Aave 凍結中，借不到" : ""}`,
+      message: tr(
+        `${n} Uniswap ${best.name} 的 ETH 比 Aave 預言機貴 ${pct(best.premiumBps)}${blocked ? "，但 Aave 凍結中，借不到" : ""}`,
+        `${n} Uniswap ${best.name}: ETH is ${pct(best.premiumBps)} above the Aave oracle${blocked ? ", but Aave is frozen, can't borrow" : ""}`,
+      ),
     });
   }
   if (debt > 0n && p!.hf < CFG.emergencyHf) {
-    out.push({ level: "critical", code: `hf_low:${k}`, kind: "condition", message: `${n} 健康因子 ${fmtHf(p!.hf)}，低於 ${formatUnits(CFG.emergencyHf, 18)}，有清算風險` });
+    const [hf, min] = [fmtHf(p!.hf), formatUnits(CFG.emergencyHf, 18)];
+    out.push({ level: "critical", code: `hf_low:${k}`, kind: "condition", message: tr(`${n} 健康因子 ${hf}，低於 ${min}，有清算風險`, `${n} health factor ${hf}, below ${min}, liquidation risk`) });
   }
   if ((out.length > 0 || debt > 0n) && !alive) {
-    out.push({ level: "warning", code: `bot_not_running:${k}`, kind: "condition", message: `${n} 有機會或有持倉，但這條鏈沒有在跑的套利機器人（node start.ts）` });
+    out.push({
+      level: "warning",
+      code: `bot_not_running:${k}`,
+      kind: "condition",
+      message: tr(`${n} 有機會或有持倉，但這條鏈沒有在跑的套利機器人（node start.ts）`, `${n} has an opportunity or an open position, but no arb bot is running on this chain (node start.ts)`),
+    });
   }
   if (health && health.actionFailures >= CFG.actionFailAlert) {
-    out.push({ level: "warning", code: `action_failing:${k}`, kind: "condition", message: `${n} 機器人連續 ${health.actionFailures} 次動作沒成功（模擬失敗或交易沒上鏈），看 trader.sh logs` });
+    const x = health.actionFailures;
+    out.push({
+      level: "warning",
+      code: `action_failing:${k}`,
+      kind: "condition",
+      message: tr(`${n} 機器人連續 ${x} 次動作沒成功（模擬失敗或交易沒上鏈），看 trader.sh logs`, `${n} bot failed ${x} actions in a row (simulation failed or tx not mined), see trader.sh logs`),
+    });
   }
   if (health?.gasLow) {
-    out.push({ level: "warning", code: `gas_low:${k}`, kind: "condition", message: `${n} 錢包的 ETH 快不夠付 gas 了（有部位時，緊急降槓桿會送不出去）` });
+    out.push({
+      level: "warning",
+      code: `gas_low:${k}`,
+      kind: "condition",
+      message: tr(`${n} 錢包的 ETH 快不夠付 gas 了（有部位時，緊急降槓桿會送不出去）`, `${n} wallet is running low on ETH for gas (with a position open, an emergency deleverage can't be sent)`),
+    });
   }
   if (debt > 0n) {
-    out.push({ level: "info", code: `position_open:${k}`, kind: "condition", message: `${n} 持倉中：債 ${Number(formatUnits(debt, 18)).toFixed(3)} WETH，健康因子 ${fmtHf(p!.hf)}` });
+    const [d, hf] = [Number(formatUnits(debt, 18)).toFixed(3), fmtHf(p!.hf)];
+    out.push({ level: "info", code: `position_open:${k}`, kind: "condition", message: tr(`${n} 持倉中：債 ${d} WETH，健康因子 ${hf}`, `${n} position open: debt ${d} WETH, health factor ${hf}`) });
   }
-  if (m.wethFrozen) out.push({ level: "info", code: `aave_frozen:${k}`, kind: "condition", message: `${n} Aave V3 的 WETH 凍結中，不能借` });
+  if (m.wethFrozen) out.push({ level: "info", code: `aave_frozen:${k}`, kind: "condition", message: tr(`${n} Aave V3 的 WETH 凍結中，不能借`, `${n} Aave V3 WETH is frozen, can't borrow`) });
   return out;
 }
 
@@ -985,8 +1068,8 @@ class Alerts {
     const first = !this.last;
     this.last = codes;
     if (first ? !now.some((f) => f.level !== "info") : added.length + resolved.length === 0) return;
-    for (const f of now.filter((f) => added.includes(f.code))) console.log(`  [警示] ${f.level} ${f.code}：${f.message}`);
-    for (const c of resolved) console.log(`  [警示] 已恢復 ${c}`);
+    for (const f of now.filter((f) => added.includes(f.code))) console.log(tr(`  [警示] ${f.level} ${f.code}：${f.message}`, `  [alert] ${f.level} ${f.code}: ${f.message}`));
+    for (const c of resolved) console.log(tr(`  [警示] 已恢復 ${c}`, `  [alert] resolved ${c}`));
     if (!CFG.alertWebhookUrl) return;
     const headers: Record<string, string> = { "content-type": "application/json" };
     const i = CFG.alertWebhookHeader.indexOf(":");
@@ -1003,9 +1086,9 @@ class Alerts {
     };
     fetch(CFG.alertWebhookUrl, { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(10_000) })
       .then((r) => {
-        if (!r.ok) console.log(`  [警示] webhook 回 ${r.status}`);
+        if (!r.ok) console.log(tr(`  [警示] webhook 回 ${r.status}`, `  [alert] webhook returned ${r.status}`));
       })
-      .catch((e) => console.log(`  [警示] webhook 送不出去：${errMsg(e)}`));
+      .catch((e) => console.log(tr(`  [警示] webhook 送不出去：${errMsg(e)}`, `  [alert] webhook failed: ${errMsg(e)}`)));
   }
 }
 
@@ -1018,7 +1101,10 @@ export async function exitAll(ctx: Ctx, arb: Address, sender: Sender) {
   for (let round = 1; ; round++) {
     const p = await readPosition(ctx, arb);
     if (p.debt === 0n) break;
-    if (round > 30) throw new Error(`${n} 買了 30 輪還有 ${formatUnits(p.debt, 18)} WETH 債，先停下來`);
+    if (round > 30) {
+      const d = formatUnits(p.debt, 18);
+      throw new Error(tr(`${n} 買了 30 輪還有 ${d} WETH 債，先停下來`, `${n} still has ${d} WETH debt after 30 rounds, stopping`));
+    }
     const m = await readMarket(ctx);
     if (round > 1) console.log(describe(ctx, m, p));
     let closed = false;
@@ -1035,12 +1121,15 @@ export async function exitAll(ctx: Ctx, arb: Address, sender: Sender) {
           small ??= q;
           continue;
         }
-        console.log(`  [${n}] 第 ${round} 輪：在 ${q.name} 買回 ${formatUnits(weth, 18)} WETH，付 ${formatUnits(paid, q.stableDecimals)} ${q.stableName}`);
-        await sender.call("平倉", arb, "close", [q.address, CFG.exitMaxPremiumBps, 0n]);
+        const [w, s] = [formatUnits(weth, 18), formatUnits(paid, q.stableDecimals)];
+        console.log(
+          tr(`  [${n}] 第 ${round} 輪：在 ${q.name} 買回 ${w} WETH，付 ${s} ${q.stableName}`, `  [${n}] round ${round}: buy back ${w} WETH on ${q.name}, pay ${s} ${q.stableName}`),
+        );
+        await sender.call(tr("平倉", "close"), arb, "close", [q.address, CFG.exitMaxPremiumBps, 0n]);
         closed = true;
         break;
       } catch (e) {
-        console.log(`  [${n}] ${q.name} 不行：${errMsg(e)}`);
+        console.log(tr(`  [${n}] ${q.name} 不行：${errMsg(e)}`, `  [${n}] ${q.name} failed: ${errMsg(e)}`));
       }
     }
     if (!closed && aggregatorOn() && (await ctx.client.readContract({ address: arb, abi: arbAbi, functionName: "routers", args: [KYBER_ROUTER] }).catch(() => false))) {
@@ -1048,17 +1137,18 @@ export async function exitAll(ctx: Ctx, arb: Address, sender: Sender) {
       if (plan) {
         try {
           await simulate(ctx, arb, owner, "closeVia", [plan.stable, plan.w, plan.stableIn, CFG.exitMaxPremiumBps, plan.route.router, plan.route.data]);
-          console.log(`  [${n}] 第 ${round} 輪：經聚合器買回 ${formatUnits(plan.w, 18)} WETH，付 ${formatUnits(plan.stableIn, ctx.decimals.get(plan.stable)!)} ${stableName(ctx, plan.stable)}`);
-          await sender.call("平倉", arb, "closeVia", [plan.stable, plan.w, plan.stableIn, CFG.exitMaxPremiumBps, plan.route.router, plan.route.data]);
+          const [w, s, name] = [formatUnits(plan.w, 18), formatUnits(plan.stableIn, ctx.decimals.get(plan.stable)!), stableName(ctx, plan.stable)];
+          console.log(tr(`  [${n}] 第 ${round} 輪：經聚合器買回 ${w} WETH，付 ${s} ${name}`, `  [${n}] round ${round}: buy back ${w} WETH via the aggregator, pay ${s} ${name}`));
+          await sender.call(tr("平倉", "close"), arb, "closeVia", [plan.stable, plan.w, plan.stableIn, CFG.exitMaxPremiumBps, plan.route.router, plan.route.data]);
           closed = true;
         } catch (e) {
-          console.log(`  [${n}] 聚合器不行：${errMsg(e)}`);
+          console.log(tr(`  [${n}] 聚合器不行：${errMsg(e)}`, `  [${n}] aggregator failed: ${errMsg(e)}`));
         }
       }
     }
     if (!closed && small) {
-      console.log(`  [${n}] 第 ${round} 輪：只剩 ${small.name} 能買，買一點是一點`);
-      await sender.call("平倉", arb, "close", [small.address, CFG.exitMaxPremiumBps, 0n]);
+      console.log(tr(`  [${n}] 第 ${round} 輪：只剩 ${small.name} 能買，買一點是一點`, `  [${n}] round ${round}: only ${small.name} can still buy, taking what it can`));
+      await sender.call(tr("平倉", "close"), arb, "close", [small.address, CFG.exitMaxPremiumBps, 0n]);
       closed = true;
     }
     if (!closed) {
@@ -1071,25 +1161,44 @@ export async function exitAll(ctx: Ctx, arb: Address, sender: Sender) {
         if (!pools.length) continue;
         const cheapest = pools.reduce((a, b) => (a.premiumBps < b.premiumBps ? a : b));
         if (cheapest.premiumBps > CFG.exitMaxPremiumBps) {
-          reasons.push(`${name} 的池子最便宜也比預言機貴 ${pct(cheapest.premiumBps)}（上限 ${pct(CFG.exitMaxPremiumBps)}，可以晚點再跑或調高 EXIT_MAX_PREMIUM_BPS）`);
+          const [prem, max] = [pct(cheapest.premiumBps), pct(CFG.exitMaxPremiumBps)];
+          reasons.push(
+            tr(
+              `${name} 的池子最便宜也比預言機貴 ${prem}（上限 ${max}，可以晚點再跑或調高 EXIT_MAX_PREMIUM_BPS）`,
+              `${name}: even the cheapest pool is ${prem} above the oracle (limit ${max}; run again later or raise EXIT_MAX_PREMIUM_BPS)`,
+            ),
+          );
           continue;
         }
         const affordable = await ctx.client.readContract({ address: arb, abi: arbAbi, functionName: "wethAffordable", args: [stable, cheapest.fee, CFG.exitMaxPremiumBps] });
-        if (affordable === 0n) reasons.push(`Aave 的 ${name} 現金被借光了，抵押提不出來；把 ${name} 直接轉進合約 ${arb} 就能拿來付`);
-        else reasons.push(`${name} 模擬失敗（看上面的錯誤）`);
+        if (affordable === 0n) {
+          reasons.push(
+            tr(
+              `Aave 的 ${name} 現金被借光了，抵押提不出來；把 ${name} 直接轉進合約 ${arb} 就能拿來付`,
+              `Aave's ${name} cash is fully borrowed, so the collateral can't be withdrawn; send ${name} straight to contract ${arb} to pay with it`,
+            ),
+          );
+        } else reasons.push(tr(`${name} 模擬失敗（看上面的錯誤）`, `${name} simulation failed (see the error above)`));
       }
-      throw new Error(`${n} 還有 ${formatUnits(p.debt, 18)} WETH 債，這一輪平不掉：\n  ${reasons.join("\n  ") || "合約裡沒有穩定幣抵押"}`);
+      const d = formatUnits(p.debt, 18);
+      throw new Error(
+        tr(
+          `${n} 還有 ${d} WETH 債，這一輪平不掉：\n  ${reasons.join("\n  ") || "合約裡沒有穩定幣抵押"}`,
+          `${n} still has ${d} WETH debt and can't close it this round:\n  ${reasons.join("\n  ") || "no stablecoin collateral in the contract"}`,
+        ),
+      );
     }
   }
 
   const p = await readPosition(ctx, arb);
   for (const [stable, amount] of p.collateral) {
     if (amount === 0n) continue;
-    console.log(`  [${n}] 提領 ${formatUnits(amount, ctx.decimals.get(stable)!)} ${stableName(ctx, stable)} 回錢包`);
-    await sender.call("提領", arb, "withdraw", [stable, MAX_UINT, owner]);
+    const [a, name] = [formatUnits(amount, ctx.decimals.get(stable)!), stableName(ctx, stable)];
+    console.log(tr(`  [${n}] 提領 ${a} ${name} 回錢包`, `  [${n}] withdraw ${a} ${name} to the wallet`));
+    await sender.call(tr("提領", "withdraw"), arb, "withdraw", [stable, MAX_UINT, owner]);
   }
   for (const token of [ctx.chain.weth, ...Object.values(ctx.chain.stables)]) {
     const bal = await ctx.client.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [arb] });
-    if (bal > 0n) await sender.call("掃零頭", arb, "sweep", [token, owner]);
+    if (bal > 0n) await sender.call(tr("掃零頭", "sweep dust"), arb, "sweep", [token, owner]);
   }
 }

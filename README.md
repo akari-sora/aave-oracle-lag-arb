@@ -2,7 +2,7 @@
 
 When ETH on Uniswap trades well above Aave's Chainlink oracle, borrow WETH from Aave at the oracle price, sell it on the DEX, and buy it back once the gap closes.
 
-[繁體中文](README.zh-TW.md)
+English · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
 Canonical repo, issues and releases: https://gitlab.com/aa22396584/aave-oracle-lag-arb
 
@@ -19,7 +19,7 @@ Canonical repo, issues and releases: https://gitlab.com/aa22396584/aave-oracle-l
 
 *Rehearsal on a local anvil fork of Ethereum mainnet with the current code: Aave unfreezes, ETH on Uniswap is pushed 10% above the oracle, the bot opens, prices converge, it closes and exits: 100,000 → 116,484 USDC. The events are simulated and time is compressed; it is not a real trade.*
 
-CLI messages and code comments are in Traditional Chinese for now.
+CLI messages are Traditional Chinese by default; set `BOT_LANG=en` for English. Code comments are Traditional Chinese.
 
 ## Background
 
@@ -557,6 +557,7 @@ Under the supervisor, add the variables to `ARB_CONFIG_DIR/env` (`set-wallet.sh`
 | `LOG_MS` | 30000 | How often to print a line when nothing is happening |
 | `MNEMONIC_INDEX` / `MNEMONIC_PATH` | — | Pick the mnemonic account directly instead of scanning |
 | `ARB_ADDRESS_<CHAIN>` | `state.json` | Contract address to use |
+| `BOT_LANG` | — | `en` = English messages; anything else = Traditional Chinese |
 
 ## Tests
 

@@ -53,6 +53,7 @@ import {
   type Ctx,
   type Finding,
 } from "./core.ts";
+import { tr } from "./i18n.ts";
 
 const args = process.argv.slice(2);
 const cmd = args[0] && !args[0].startsWith("--") ? args[0] : "start";
@@ -106,7 +107,9 @@ async function askHidden(q: string, password = false): Promise<string> {
           if (rest) stdin.unshift(rest); // 同一批進來的後續輸入留給下一個問題
           const clean = password ? buf.replace(/\x1b\[[0-9;?]*[ -\/]*[@-~]/g, "").replace(/[\x00-\x1f\x7f]/g, "") : cleanInput(buf);
           const words = password ? 1 : clean.split(/\s+/).length;
-          process.stdout.write(`（收到 ${words > 1 ? `${words} 個單字` : `${clean.length} 個字元`}）\n`);
+          process.stdout.write(
+            tr(`（收到 ${words > 1 ? `${words} 個單字` : `${clean.length} 個字元`}）\n`, `(got ${words > 1 ? `${words} words` : `${clean.length} characters`})\n`),
+          );
           resolve(clean);
           return;
         }
@@ -121,30 +124,42 @@ async function askHidden(q: string, password = false): Promise<string> {
 async function getAccount(ctxs: Ctx[]): Promise<LocalAccount> {
   // 環境變數：PRIVATE_KEY／MNEMONIC／KEY 直接放值；KEY_ENV 指向另一個變數名稱（例如安全儲存注入的）；KEY_FILE 指向放 key 的檔案
   const indirect = process.env.KEY_ENV ? process.env[process.env.KEY_ENV] : undefined;
-  if (process.env.KEY_ENV && !indirect) throw new Error(`KEY_ENV=${process.env.KEY_ENV}，但環境變數 ${process.env.KEY_ENV} 是空的`);
+  if (process.env.KEY_ENV && !indirect) {
+    const v = process.env.KEY_ENV;
+    throw new Error(tr(`KEY_ENV=${v}，但環境變數 ${v} 是空的`, `KEY_ENV=${v}, but environment variable ${v} is empty`));
+  }
   const fromEnv =
     process.env.PRIVATE_KEY || process.env.MNEMONIC || process.env.KEY || indirect || (process.env.KEY_FILE ? readFileSync(process.env.KEY_FILE, "utf8") : undefined);
   let raw = fromEnv ?? (flag("account") ? `foundry:${flag("account")}` : undefined);
   let fromKeychain = false;
   if (!raw) {
     const saved = keychainLoad();
-    if (saved && (await confirm(`用 macOS 鑰匙圈裡記住的錢包 ${saved.address}？`, true))) [raw, fromKeychain] = [saved.secret, true];
+    if (saved && (await confirm(tr(`用 macOS 鑰匙圈裡記住的錢包 ${saved.address}？`, `Use the wallet saved in the macOS Keychain, ${saved.address}?`), true))) {
+      [raw, fromKeychain] = [saved.secret, true];
+    }
   }
-  raw ??= await askHidden("貼上私鑰、助記詞、keystore 檔路徑或 op://…（不會顯示，也不會存檔）：");
+  raw ??= await askHidden(tr("貼上私鑰、助記詞、keystore 檔路徑或 op://…（不會顯示，也不會存檔）：", "Paste a private key, mnemonic, keystore file path or op://… (hidden, not saved): "));
   const secret = await parseSecret(raw, (q) => askHidden(q, true));
-  if (secret.kind === "mnemonic") console.log(`助記詞：${secret.language}，${secret.phrase.split(/\s+/).length} 個字，檢查碼正確`);
-  else if (secret.source !== "私鑰") console.log(`從 ${secret.source} 讀到私鑰`);
+  if (secret.kind === "mnemonic") {
+    const n = secret.phrase.split(/\s+/).length;
+    console.log(tr(`助記詞：${secret.language}，${n} 個字，檢查碼正確`, `Mnemonic: ${secret.language}, ${n} words, checksum OK`));
+  } else if (secret.source !== "私鑰") console.log(tr(`從 ${secret.source} 讀到私鑰`, `Read the private key from ${secret.source}`));
 
   const account = secret.kind === "mnemonic" ? await pickFromMnemonic(secret, ctxs) : accountFor(secret);
-  console.log(`錢包 ${account.address}（每條鏈都是這個地址）`);
-  if (!fromKeychain && !(await confirm("是這個錢包嗎？", true))) process.exit(0);
+  console.log(tr(`錢包 ${account.address}（每條鏈都是這個地址）`, `Wallet ${account.address} (same address on every chain)`));
+  if (!fromKeychain && !(await confirm(tr("是這個錢包嗎？", "Is this the right wallet?"), true))) process.exit(0);
 
   // 只存選中那個地址的私鑰，不存整組助記詞
   if (!fromKeychain && !fromEnv && !YES && keychainAvailable() && process.stdin.isTTY) {
-    if (await confirm("要記在 macOS 鑰匙圈嗎？下次就不用再貼（node start.ts forget 可以刪掉）", false)) {
+    if (
+      await confirm(
+        tr("要記在 macOS 鑰匙圈嗎？下次就不用再貼（node start.ts forget 可以刪掉）", "Save it in the macOS Keychain? Then you won't have to paste it next time (node start.ts forget removes it)"),
+        false,
+      )
+    ) {
       const key = secret.kind === "privateKey" ? secret.key : toHex((account as ReturnType<typeof accountFor> & { getHdKey(): { privateKey: Uint8Array } }).getHdKey().privateKey);
       keychainSave(account.address, key);
-      console.log("已記在鑰匙圈（服務名稱 aave-u-eth）");
+      console.log(tr("已記在鑰匙圈（服務名稱 aave-u-eth）", "Saved in the Keychain (service name aave-u-eth)"));
     }
   }
   return account;
@@ -155,7 +170,8 @@ async function pickFromMnemonic(secret: Extract<Secret, { kind: "mnemonic" }>, c
   if (process.env.MNEMONIC_PATH) return accountFor(secret, process.env.MNEMONIC_PATH as `m/44'/60'/${string}`);
   if (process.env.MNEMONIC_INDEX) return accountFor(secret, `m/44'/60'/0'/0/${Number(process.env.MNEMONIC_INDEX)}`);
   const cands = candidatePaths().map((c) => ({ ...c, account: accountFor(secret, c.path) }));
-  console.log("查這組助記詞常用的地址在各條鏈上的餘額…");
+  console.log(tr("查這組助記詞常用的地址在各條鏈上的餘額…", "Checking balances of this mnemonic's common addresses on each chain…"));
+  const lookupFailed = tr("（查詢失敗）", "(lookup failed)");
   const state = loadState();
   const summaries = await Promise.all(
     cands.map(async (c) => {
@@ -165,19 +181,26 @@ async function pickFromMnemonic(secret: Extract<Secret, { kind: "mnemonic" }>, c
           const usd = wallet.reduce((sum, w) => sum + Number(formatUnits(w.bal, w.dec)), 0);
           const hasArb = Boolean(state[c.account.address.toLowerCase()]?.[ctx.chain.key]);
           if (eth === 0n && usd === 0 && !hasArb) return "";
-          return `${ctx.chain.name} ${Number(formatEther(eth)).toFixed(4)} ETH ${usd.toFixed(0)} U${hasArb ? " 有合約" : ""}`;
+          return `${ctx.chain.name} ${Number(formatEther(eth)).toFixed(4)} ETH ${usd.toFixed(0)} U${hasArb ? tr(" 有合約", " has contract") : ""}`;
         }),
-      ).catch(() => ["（查詢失敗）"]);
-      return parts.filter(Boolean).join("｜");
+      ).catch(() => [lookupFailed]);
+      return parts.filter(Boolean).join(tr("｜", " | "));
     }),
   );
-  cands.forEach((c, i) => console.log(`  ${i + 1}. ${c.label.padEnd(14)} ${c.account.address}  ${summaries[i] || "（空的）"}`));
-  const suggested = Math.max(0, summaries.findIndex((s) => s && s !== "（查詢失敗）"));
+  cands.forEach((c, i) => console.log(`  ${i + 1}. ${c.label.padEnd(14)} ${c.account.address}  ${summaries[i] || tr("（空的）", "(empty)")}`));
+  const suggested = Math.max(0, summaries.findIndex((s) => s && s !== lookupFailed));
   // 全自動時不猜：猜錯會把別的錢包的錢存進來，或重啟時換到另一個地址、丟下原本的部位
-  if (YES) throw new Error("全自動模式用助記詞，要指定地址：MNEMONIC_INDEX=<上面的編號減 1>（MetaMask 路徑），或 MNEMONIC_PATH=<完整路徑>");
-  const a = await ask(`用哪一個？（Enter = ${suggested + 1}；其他路徑用 MNEMONIC_PATH）`);
+  if (YES) {
+    throw new Error(
+      tr(
+        "全自動模式用助記詞，要指定地址：MNEMONIC_INDEX=<上面的編號減 1>（MetaMask 路徑），或 MNEMONIC_PATH=<完整路徑>",
+        "With a mnemonic in non-interactive mode, pick the address: MNEMONIC_INDEX=<number above minus 1> (MetaMask path), or MNEMONIC_PATH=<full path>",
+      ),
+    );
+  }
+  const a = await ask(tr(`用哪一個？（Enter = ${suggested + 1}；其他路徑用 MNEMONIC_PATH）`, `Which one? (Enter = ${suggested + 1}; for other paths use MNEMONIC_PATH) `));
   const n = a === "" ? suggested : Number(a) - 1;
-  if (!cands[n]) throw new Error(`沒有第 ${a} 個`);
+  if (!cands[n]) throw new Error(tr(`沒有第 ${a} 個`, `There is no number ${a}`));
   return cands[n].account;
 }
 
@@ -203,7 +226,7 @@ async function findArb(ctx: Ctx, owner?: Address): Promise<Address | undefined> 
   if (!owner) return undefined;
   const found = await discoverArb(ctx, owner);
   if (found) {
-    console.log(`[${ctx.chain.name}] 找到這個錢包之前部署的合約 ${found}`);
+    console.log(tr(`[${ctx.chain.name}] 找到這個錢包之前部署的合約 ${found}`, `[${ctx.chain.name}] found a contract this wallet deployed before: ${found}`));
     ((state[owner.toLowerCase()] ??= {})[k] ??= { arb: found }).arb = found;
     saveState(state);
   }
@@ -243,7 +266,7 @@ async function loadCtxs(): Promise<Ctx[]> {
   const results = await Promise.allSettled(chains.map((c) => loadCtx(c)));
   return results.flatMap((r, i) => {
     if (r.status === "fulfilled") return [r.value];
-    console.log(`[${chains[i].name}] 連不上（${errMsg(r.reason)}），這次先跳過`);
+    console.log(tr(`[${chains[i].name}] 連不上（${errMsg(r.reason)}），這次先跳過`, `[${chains[i].name}] can't connect (${errMsg(r.reason)}), skipping it this time`));
     return [];
   });
 }
@@ -257,7 +280,12 @@ function loadArtifact(): { abi: Abi; bytecode: Hex; sourceHash: string } {
     const h = createHash("sha256");
     for (const u of sources) h.update(readFileSync(u));
     if (h.digest("hex") !== art.sourceHash) {
-      throw new Error("src/ 的合約跟 bot/OracleLagArb.json 對不上。改過合約要先 forge build，再跑 node export-artifact.ts");
+      throw new Error(
+        tr(
+          "src/ 的合約跟 bot/OracleLagArb.json 對不上。改過合約要先 forge build，再跑 node export-artifact.ts",
+          "The contract in src/ doesn't match bot/OracleLagArb.json. After changing the contract, run forge build, then node export-artifact.ts",
+        ),
+      );
     }
   }
   return art;
@@ -269,10 +297,11 @@ async function deploy(ctx: Ctx, sender: Sender): Promise<Address | undefined> {
   const data = encodeDeployData({ abi: art.abi, bytecode: art.bytecode, args: [c.aaveProvider, c.weth, c.uniFactory] });
   const gas = await ctx.client.estimateGas({ account: sender.account.address, data });
   const price = await ctx.client.getGasPrice();
-  console.log(`[${c.name}] 還沒有套利合約，要先部署（約 ${Number(formatEther((gas * price * 125n) / 100n)).toFixed(6)} ETH gas）`);
-  if (!(await confirm(`在 ${c.name} 部署？`))) return undefined;
-  const r = await sender.sendAndWait("部署合約", undefined, data);
-  console.log(`  [${c.name}] 合約 ${r.contractAddress}`);
+  const cost = Number(formatEther((gas * price * 125n) / 100n)).toFixed(6);
+  console.log(tr(`[${c.name}] 還沒有套利合約，要先部署（約 ${cost} ETH gas）`, `[${c.name}] no arb contract yet, it needs to be deployed first (about ${cost} ETH gas)`));
+  if (!(await confirm(tr(`在 ${c.name} 部署？`, `Deploy on ${c.name}?`)))) return undefined;
+  const r = await sender.sendAndWait(tr("部署合約", "deploy contract"), undefined, data);
+  console.log(tr(`  [${c.name}] 合約 ${r.contractAddress}`, `  [${c.name}] contract ${r.contractAddress}`));
   return r.contractAddress!;
 }
 
@@ -300,32 +329,47 @@ async function depositFlow(ctx: Ctx, sender: Sender, arb: Address, entry: Entry,
   const n = ctx.chain.name;
   const owner = sender.account.address;
   const tokenFlag = flag("token")?.toUpperCase();
-  if (tokenFlag && !wallet.some((w) => w.name === tokenFlag)) throw new Error(`--token 只能是 ${wallet.map((w) => w.name).join("／")}`);
+  if (tokenFlag && !wallet.some((w) => w.name === tokenFlag)) {
+    throw new Error(tr(`--token 只能是 ${wallet.map((w) => w.name).join("／")}`, `--token must be one of ${wallet.map((w) => w.name).join("/")}`));
+  }
   const m = await readMarket(ctx);
   const pending = new Map((entry.pendingDeposits ?? []).map((d) => [d.token, BigInt(d.amount)]));
 
   for (const w of wallet.filter((w) => w.bal > 0n && (!tokenFlag || w.name === tokenFlag))) {
-    const raw = flag("deposit") ?? (await ask(`[${n}] 要存多少 ${w.name} 進合約當本金？（Enter = 全部 ${formatUnits(w.bal, w.dec)}，0 = 不存）`));
+    const all = formatUnits(w.bal, w.dec);
+    const raw =
+      flag("deposit") ??
+      (await ask(
+        tr(`[${n}] 要存多少 ${w.name} 進合約當本金？（Enter = 全部 ${all}，0 = 不存）`, `[${n}] How much ${w.name} to deposit into the contract as capital? (Enter = all ${all}, 0 = none) `),
+      ));
     const amount = raw === "" || raw === "all" ? w.bal : parseUnits(raw, w.dec);
     if (amount === 0n) continue;
     if (amount > w.bal) {
-      console.log(`[${n}] 錢包只有 ${formatUnits(w.bal, w.dec)} ${w.name}，這種不存`);
+      console.log(tr(`[${n}] 錢包只有 ${all} ${w.name}，這種不存`, `[${n}] the wallet only has ${all} ${w.name}, not depositing this one`));
       continue;
     }
 
     const allowance = await ctx.client.readContract({ address: w.token, abi: erc20Abi, functionName: "allowance", args: [owner, arb] });
     if (allowance < amount) {
       const approve = (x: bigint) => encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [arb, x] });
-      if (allowance > 0n && w.name === "USDT") await sender.sendAndWait("USDT 授權歸零", w.token, approve(0n)); // USDT 不能直接改非零授權
-      await sender.sendAndWait(`授權 ${w.name}`, w.token, approve(amount));
+      if (allowance > 0n && w.name === "USDT") await sender.sendAndWait(tr("USDT 授權歸零", "reset USDT approval"), w.token, approve(0n)); // USDT 不能直接改非零授權
+      await sender.sendAndWait(tr(`授權 ${w.name}`, `approve ${w.name}`), w.token, approve(amount));
     }
 
     const room = m.stableOk.get(w.token) ? m.stableRoom.get(w.token)! : 0n;
     const now = amount < room ? amount : room;
-    if (now > 0n) await sender.call("存本金", arb, "deposit", [w.token, now]);
+    if (now > 0n) await sender.call(tr("存本金", "deposit"), arb, "deposit", [w.token, now]);
     if (amount > now) {
-      const why = m.stableOk.get(w.token) ? `Aave 的 ${w.name} 存款上限滿了` : `Aave 現在凍結（或 ${w.name} 的 LTV 是 0）`;
-      console.log(`[${n}] ${why}，還有 ${formatUnits(amount - now, w.dec)} ${w.name} 存不進去。授權已經給了，機器人會在能存的那個區塊自動存`);
+      const why = m.stableOk.get(w.token)
+        ? tr(`Aave 的 ${w.name} 存款上限滿了`, `Aave's ${w.name} supply cap is full`)
+        : tr(`Aave 現在凍結（或 ${w.name} 的 LTV 是 0）`, `Aave is frozen right now (or ${w.name} has an LTV of 0)`);
+      const left = formatUnits(amount - now, w.dec);
+      console.log(
+        tr(
+          `[${n}] ${why}，還有 ${left} ${w.name} 存不進去。授權已經給了，機器人會在能存的那個區塊自動存`,
+          `[${n}] ${why}; ${left} ${w.name} can't be deposited yet. The approval is already in place, so the bot will deposit it in the first block where it can`,
+        ),
+      );
       pending.set(w.token, amount - now);
     } else pending.delete(w.token);
   }
@@ -343,29 +387,37 @@ async function setupChain(ctx: Ctx, account: LocalAccount, state: State): Promis
   const owner = account.address;
   const key = owner.toLowerCase();
   const [eth, wallet, existing] = await Promise.all([ctx.client.getBalance({ address: owner }), walletOf(ctx, owner), findArb(ctx, owner)]);
-  console.log(`\n[${c.name}] ETH ${Number(formatEther(eth)).toFixed(5)}｜${wallet.map((w) => `${formatUnits(w.bal, w.dec)} ${w.name}`).join("，")}｜送交易 ${c.sendRpcUrl}`);
+  const [ethStr, coins] = [Number(formatEther(eth)).toFixed(5), wallet.map((w) => `${formatUnits(w.bal, w.dec)} ${w.name}`)];
+  console.log(tr(`\n[${c.name}] ETH ${ethStr}｜${coins.join("，")}｜送交易 ${c.sendRpcUrl}`, `\n[${c.name}] ETH ${ethStr} | ${coins.join(", ")} | sending via ${c.sendRpcUrl}`));
   const hasStable = wallet.some((w) => w.bal > 0n);
   if (eth === 0n) {
     // 有合約的話照樣讀部位、推警示（例如持倉中 gas 用完了，HF 變低還是要知道），只是不送交易
-    console.log(`[${c.name}] 沒有 ETH 付 gas，這條鏈只監控${existing ? "（有合約，會看部位）" : ""}`);
+    console.log(
+      tr(
+        `[${c.name}] 沒有 ETH 付 gas，這條鏈只監控${existing ? "（有合約，會看部位）" : ""}`,
+        `[${c.name}] no ETH for gas, only monitoring this chain${existing ? " (has a contract, will watch the position)" : ""}`,
+      ),
+    );
     return { ctx, arb: existing };
   }
-  if (eth < minGas(c.key)) console.log(`[${c.name}] ⚠ ETH 偏少，建議至少 ${formatEther(minGas(c.key))}`);
+  if (eth < minGas(c.key)) console.log(tr(`[${c.name}] ⚠ ETH 偏少，建議至少 ${formatEther(minGas(c.key))}`, `[${c.name}] ⚠ ETH is low, at least ${formatEther(minGas(c.key))} is recommended`));
   const sender = new Sender(account, ctx);
   const arb = existing ?? (hasStable && !CFG.closeOnly ? await deploy(ctx, sender) : undefined);
   if (!arb) {
-    console.log(`[${c.name}] 沒有合約${hasStable ? "" : "，錢包也沒有 USDC／USDT"}，這條鏈只監控`);
+    console.log(
+      tr(`[${c.name}] 沒有合約${hasStable ? "" : "，錢包也沒有 USDC／USDT"}，這條鏈只監控`, `[${c.name}] no contract${hasStable ? "" : " and no USDC/USDT in the wallet"}, only monitoring this chain`),
+    );
     return { ctx };
   }
   const arbOwner = await ctx.client.readContract({ address: arb, abi: arbAbi, functionName: "owner" });
-  if (arbOwner.toLowerCase() !== key) throw new Error(`合約 ${arb} 的 owner 是 ${arbOwner}，不是這個錢包`);
+  if (arbOwner.toLowerCase() !== key) throw new Error(tr(`合約 ${arb} 的 owner 是 ${arbOwner}，不是這個錢包`, `contract ${arb} is owned by ${arbOwner}, not this wallet`));
   const entry = ((state[key] ??= {})[c.key] ??= { arb });
   entry.arb = arb;
   saveState(state);
 
   // 聚合器路徑：把 KyberSwap router 加進合約白名單（一次就好）
   if (aggregatorOn() && !(await ctx.client.readContract({ address: arb, abi: arbAbi, functionName: "routers", args: [KYBER_ROUTER] }))) {
-    await sender.call("把聚合器加進白名單", arb, "setRouter", [KYBER_ROUTER, true]);
+    await sender.call(tr("把聚合器加進白名單", "allow the aggregator router"), arb, "setRouter", [KYBER_ROUTER, true]);
   }
   console.log(describe(ctx, await readMarket(ctx), await readPosition(ctx, arb)));
   if (!CFG.closeOnly) await depositFlow(ctx, sender, arb, entry, wallet);
@@ -378,7 +430,9 @@ async function start() {
   const results = await Promise.allSettled(chains.map((c) => loadCtx(c)));
   const ctxs = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
   const failed = chains.filter((_, i) => results[i].status === "rejected");
-  for (const [i, r] of results.entries()) if (r.status === "rejected") console.log(`[${chains[i].name}] 連不上（${errMsg(r.reason)}）`);
+  for (const [i, r] of results.entries()) {
+    if (r.status === "rejected") console.log(tr(`[${chains[i].name}] 連不上（${errMsg(r.reason)}）`, `[${chains[i].name}] can't connect (${errMsg(r.reason)})`));
+  }
   const account = await getAccount(ctxs);
   const owner = account.address;
   const key = owner.toLowerCase();
@@ -392,7 +446,7 @@ async function start() {
     try {
       plans.push(await setupChain(ctx, account, state));
     } catch (e) {
-      console.log(`[${ctx.chain.name}] 設定沒做完：${errMsg(e)}`);
+      console.log(tr(`[${ctx.chain.name}] 設定沒做完：${errMsg(e)}`, `[${ctx.chain.name}] setup didn't finish: ${errMsg(e)}`));
       const arb = state[key]?.[ctx.chain.key]?.arb;
       if (arb) plans.push({ ctx, arb, sender: new Sender(account, ctx) });
       else retrySetup.push(ctx);
@@ -406,14 +460,32 @@ async function start() {
     if (!pos || [...pos.collateral.values()].some((v) => v > 0n) || pos.debt > 0n || state[key]?.[p.ctx.chain.key]?.pendingDeposits) trading.push(p.ctx.chain.name);
   }
   const watching = plans.map((p) => p.ctx.chain.name).filter((n) => !trading.includes(n));
-  console.log(`\n會自動交易：${trading.join("、") || "（沒有，合約裡都沒有本金）"}｜只監控：${watching.join("、") || "（無）"}${failed.length ? `｜連不上：${failed.map((c) => c.name).join("、")}` : ""}`);
+  const down = failed.map((c) => c.name);
   console.log(
-    `門檻：溢價 ≥ ${Number(CFG.openPremiumBps) / 100}% 持續 ${CFG.confirmSeconds} 秒就開倉、賣到剩 ${Number(CFG.minEdgeBps) / 100}% 停、` +
-      `HF 目標 ${Number(CFG.targetHf) / 1e18}；溢價 ≤ ${Number(CFG.closePremiumBps) / 100}% 平倉；HF < ${Number(CFG.emergencyHf) / 1e18} 緊急降槓桿` +
-      (CFG.closeOnly ? "｜CLOSE_ONLY：只平倉、不開倉" : ""),
+    tr(
+      `\n會自動交易：${trading.join("、") || "（沒有，合約裡都沒有本金）"}｜只監控：${watching.join("、") || "（無）"}${failed.length ? `｜連不上：${down.join("、")}` : ""}`,
+      `\nTrading: ${trading.join(", ") || "(none, no capital in any contract)"} | Monitoring only: ${watching.join(", ") || "(none)"}${failed.length ? ` | Can't connect: ${down.join(", ")}` : ""}`,
+    ),
   );
-  if (!(await confirm("開始？"))) return;
-  console.log("機器人開始跑，Ctrl+C 停止。停止後倉位還在，要出場就執行 node start.ts exit\n");
+  const [openP, edge, hf, closeP, emHf] = [
+    Number(CFG.openPremiumBps) / 100,
+    Number(CFG.minEdgeBps) / 100,
+    Number(CFG.targetHf) / 1e18,
+    Number(CFG.closePremiumBps) / 100,
+    Number(CFG.emergencyHf) / 1e18,
+  ];
+  console.log(
+    tr(
+      `門檻：溢價 ≥ ${openP}% 持續 ${CFG.confirmSeconds} 秒就開倉、賣到剩 ${edge}% 停、` +
+        `HF 目標 ${hf}；溢價 ≤ ${closeP}% 平倉；HF < ${emHf} 緊急降槓桿` +
+        (CFG.closeOnly ? "｜CLOSE_ONLY：只平倉、不開倉" : ""),
+      `Thresholds: open when the premium is ≥ ${openP}% for ${CFG.confirmSeconds}s, stop selling at ${edge}% left, ` +
+        `HF target ${hf}; close when the premium is ≤ ${closeP}%; emergency deleverage when HF < ${emHf}` +
+        (CFG.closeOnly ? " | CLOSE_ONLY: close only, no new positions" : ""),
+    ),
+  );
+  if (!(await confirm(tr("開始？", "Start?")))) return;
+  console.log(tr("機器人開始跑，Ctrl+C 停止。停止後倉位還在，要出場就執行 node start.ts exit\n", "Bot is running, Ctrl+C to stop. The position stays open after stopping; to exit, run node start.ts exit\n"));
 
   const run = (p: Plan) => {
     const entry = state[key]?.[p.ctx.chain.key];
@@ -441,15 +513,18 @@ async function start() {
           try {
             l.ctx ??= await loadCtx(l.chain);
             const plan = await setupChain(l.ctx, account, state);
-            console.log(`[${l.chain.name}] 設定好了，開始顧`);
+            console.log(tr(`[${l.chain.name}] 設定好了，開始顧`, `[${l.chain.name}] set up, now running`));
             await run(plan);
           } catch (e) {
-            console.log(`[${l.chain.name}] 還沒好：${errMsg(e)}，一分鐘後再試`);
+            console.log(tr(`[${l.chain.name}] 還沒好：${errMsg(e)}，一分鐘後再試`, `[${l.chain.name}] not ready yet: ${errMsg(e)}, retrying in a minute`));
           }
         }
       })();
     }
-  } else if (later.length) console.log(`${later.map((l) => l.chain.name).join("、")} 這次沒設定好，晚點重跑 node start.ts`);
+  } else if (later.length) {
+    const names = later.map((l) => l.chain.name);
+    console.log(tr(`${names.join("、")} 這次沒設定好，晚點重跑 node start.ts`, `${names.join(", ")} not set up this time, run node start.ts again later`));
+  }
   await Promise.all(plans.map(run));
   if (later.length && YES) await new Promise(() => {}); // 全部鏈都在背景重試時，程式不能先結束
 }
@@ -464,8 +539,16 @@ async function exit() {
     console.log(describe(ctx, await readMarket(ctx), await readPosition(ctx, arb)));
     targets.push({ ctx, arb });
   }
-  if (targets.length === 0) throw new Error("這個錢包在這幾條鏈上都沒有套利合約（state.json 裡找不到，也沒設 ARB_ADDRESS_<鏈>）");
-  if (!(await confirm(`在 ${targets.map((t) => t.ctx.chain.name).join("、")} 平倉，並把錢全部提回錢包？`))) return;
+  if (targets.length === 0) {
+    throw new Error(
+      tr(
+        "這個錢包在這幾條鏈上都沒有套利合約（state.json 裡找不到，也沒設 ARB_ADDRESS_<鏈>）",
+        "This wallet has no arb contract on these chains (none in state.json, and ARB_ADDRESS_<chain> is not set)",
+      ),
+    );
+  }
+  const names = targets.map((t) => t.ctx.chain.name);
+  if (!(await confirm(tr(`在 ${names.join("、")} 平倉，並把錢全部提回錢包？`, `Close the positions on ${names.join(", ")} and withdraw everything to the wallet?`)))) return;
 
   const state = loadState();
   const failed: string[] = [];
@@ -474,14 +557,17 @@ async function exit() {
       await exitAll(ctx, arb, new Sender(account, ctx));
       delete state[account.address.toLowerCase()]?.[ctx.chain.key]?.pendingDeposits;
       const wallet = await walletOf(ctx, account.address);
-      console.log(`[${ctx.chain.name}] 完成。錢包現在有 ${wallet.map((w) => `${formatUnits(w.bal, w.dec)} ${w.name}`).join("，")}`);
+      const coins = wallet.map((w) => `${formatUnits(w.bal, w.dec)} ${w.name}`);
+      console.log(tr(`[${ctx.chain.name}] 完成。錢包現在有 ${coins.join("，")}`, `[${ctx.chain.name}] done. The wallet now has ${coins.join(", ")}`));
     } catch (e) {
-      console.log(`[${ctx.chain.name}] 沒做完：${errMsg(e)}`);
+      console.log(tr(`[${ctx.chain.name}] 沒做完：${errMsg(e)}`, `[${ctx.chain.name}] didn't finish: ${errMsg(e)}`));
       failed.push(ctx.chain.name);
     }
   }
   saveState(state);
-  if (failed.length) throw new Error(`${failed.join("、")} 沒做完，看上面的原因，晚點再跑一次 node start.ts exit`);
+  if (failed.length) {
+    throw new Error(tr(`${failed.join("、")} 沒做完，看上面的原因，晚點再跑一次 node start.ts exit`, `${failed.join(", ")} didn't finish; see the reasons above and run node start.ts exit again later`));
+  }
 }
 
 async function status() {
@@ -495,14 +581,15 @@ async function status() {
     for (const arb of arbs) {
       const code = await ctx.client.getCode({ address: arb });
       if (!code || code === "0x") {
-        console.log(`[${ctx.chain.name}] ${arb}：鏈上沒有這個合約`);
+        console.log(tr(`[${ctx.chain.name}] ${arb}：鏈上沒有這個合約`, `[${ctx.chain.name}] ${arb}: no such contract on chain`));
         continue;
       }
       const owner = await ctx.client.readContract({ address: arb, abi: arbAbi, functionName: "owner" });
-      console.log(`[${ctx.chain.name}] 合約 ${arb}（owner ${owner}）`);
+      console.log(tr(`[${ctx.chain.name}] 合約 ${arb}（owner ${owner}）`, `[${ctx.chain.name}] contract ${arb} (owner ${owner})`));
       console.log(describe(ctx, m, await readPosition(ctx, arb)));
       for (const pd of state[owner.toLowerCase()]?.[k]?.pendingDeposits ?? []) {
-        console.log(`  等 Aave 能存時要存：${formatUnits(BigInt(pd.amount), ctx.decimals.get(pd.token)!)} ${stableName(ctx, pd.token)}`);
+        const [a, name] = [formatUnits(BigInt(pd.amount), ctx.decimals.get(pd.token)!), stableName(ctx, pd.token)];
+        console.log(tr(`  等 Aave 能存時要存：${a} ${name}`, `  to deposit once Aave accepts it: ${a} ${name}`));
       }
     }
   }
@@ -524,7 +611,7 @@ async function check() {
         if (!json) console.log(describe(ctx, m, p));
         list.push(...findings(ctx, m, p, botAlive(c.key), false, readHealth(c.key)));
       } catch (e) {
-        list.push({ level: "warning", code: `rpc_error:${c.key}`, kind: "condition", message: `${c.name} 讀不到資料：${errMsg(e)}` });
+        list.push({ level: "warning", code: `rpc_error:${c.key}`, kind: "condition", message: tr(`${c.name} 讀不到資料：${errMsg(e)}`, `${c.name} can't read data: ${errMsg(e)}`) });
       }
     }),
   );
@@ -534,7 +621,15 @@ async function check() {
     const st = JSON.parse(readFileSync(statusFile, "utf8"));
     // 只看最近 15 分鐘內的：之後恢復正常、一直跑著的話，lastExit 會越來越舊，警示自己消失
     if (Number(st.consecutiveFailures) >= 3 && Date.now() - Date.parse(st.lastExit) < 15 * 60_000) {
-      list.push({ level: "critical", code: "trader_crashloop", kind: "condition", message: `交易機器人連續 ${st.consecutiveFailures} 次啟動後很快就結束（最後一次 ${st.lastExit}，結束碼 ${st.lastCode}），看 trader.sh logs` });
+      list.push({
+        level: "critical",
+        code: "trader_crashloop",
+        kind: "condition",
+        message: tr(
+          `交易機器人連續 ${st.consecutiveFailures} 次啟動後很快就結束（最後一次 ${st.lastExit}，結束碼 ${st.lastCode}），看 trader.sh logs`,
+          `the trading bot exited soon after starting ${st.consecutiveFailures} times in a row (last at ${st.lastExit}, exit code ${st.lastCode}), see trader.sh logs`,
+        ),
+      });
     }
   }
   // --state <檔案>：記住上一輪的 code，只回報變化（給排程用，沒變化就結束碼 0、不用通知）
@@ -549,13 +644,13 @@ async function check() {
     const changed = prev ? added.length + resolved.length > 0 : list.some((f) => f.level !== "info");
     if (json) console.log(JSON.stringify({ changed, findings: list, new: added, resolved }));
     else {
-      for (const f of list.filter((f) => added.includes(f.code))) console.log(`  新：${f.level} ${f.code}：${f.message}`);
-      for (const c of resolved) console.log(`  已恢復：${c}`);
+      for (const f of list.filter((f) => added.includes(f.code))) console.log(tr(`  新：${f.level} ${f.code}：${f.message}`, `  new: ${f.level} ${f.code}: ${f.message}`));
+      for (const c of resolved) console.log(tr(`  已恢復：${c}`, `  resolved: ${c}`));
     }
     process.exit(changed ? 1 : 0);
   }
   if (json) console.log(JSON.stringify(list));
-  else for (const f of list) console.log(`  ${f.level} ${f.code}：${f.message}`);
+  else for (const f of list) console.log(tr(`  ${f.level} ${f.code}：${f.message}`, `  ${f.level} ${f.code}: ${f.message}`));
   if (list.some((f) => f.level !== "info")) process.exit(1);
 }
 
@@ -569,22 +664,28 @@ async function whoami() {
   const account = await getAccount(ctxs);
   for (const ctx of ctxs) {
     const [eth, wallet, arb] = await Promise.all([ctx.client.getBalance({ address: account.address }), walletOf(ctx, account.address), findArb(ctx, account.address)]);
-    console.log(`[${ctx.chain.name}] ETH ${Number(formatEther(eth)).toFixed(5)}｜${wallet.map((w) => `${formatUnits(w.bal, w.dec)} ${w.name}`).join("，")}｜合約 ${arb ?? "（還沒部署）"}`);
+    const [ethStr, coins] = [Number(formatEther(eth)).toFixed(5), wallet.map((w) => `${formatUnits(w.bal, w.dec)} ${w.name}`)];
+    console.log(
+      tr(
+        `[${ctx.chain.name}] ETH ${ethStr}｜${coins.join("，")}｜合約 ${arb ?? "（還沒部署）"}`,
+        `[${ctx.chain.name}] ETH ${ethStr} | ${coins.join(", ")} | contract ${arb ?? "(not deployed)"}`,
+      ),
+    );
   }
 }
 
 async function forget() {
-  console.log(keychainDelete() ? "已刪掉鑰匙圈裡的 aave-u-eth" : "鑰匙圈裡沒有記住的錢包");
+  console.log(keychainDelete() ? tr("已刪掉鑰匙圈裡的 aave-u-eth", "Removed aave-u-eth from the Keychain") : tr("鑰匙圈裡沒有記住的錢包", "No wallet saved in the Keychain"));
 }
 
 const commands: Record<string, () => Promise<unknown>> = { start, exit, status, check, watch, forget, whoami };
 if (!commands[cmd]) {
-  console.log("指令：start（預設）、exit、status、check、watch、forget、whoami");
+  console.log(tr("指令：start（預設）、exit、status、check、watch、forget、whoami", "Commands: start (default), exit, status, check, watch, forget, whoami"));
   process.exit(1);
 }
 commands[cmd]()
   .then(() => process.exit(0))
   .catch((e) => {
-    console.error(`\n錯誤：${(e as Error).message}`);
+    console.error(tr(`\n錯誤：${(e as Error).message}`, `\nError: ${(e as Error).message}`));
     process.exit(1);
   });

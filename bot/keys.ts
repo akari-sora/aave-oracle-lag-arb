@@ -26,18 +26,20 @@ import {
   spanish,
   traditionalChinese,
 } from "viem/accounts";
+import { tr } from "./i18n.ts";
 
-const WORDLISTS: [string, string[]][] = [
-  ["英文", english],
-  ["簡體中文", simplifiedChinese],
-  ["繁體中文", traditionalChinese],
-  ["日文", japanese],
-  ["韓文", korean],
-  ["西班牙文", spanish],
-  ["法文", french],
-  ["義大利文", italian],
-  ["捷克文", czech],
-  ["葡萄牙文", portuguese],
+// [中文名, 英文名, 單字表]；名稱只在印出來時用 tr 挑
+const WORDLISTS: [string, string, string[]][] = [
+  ["英文", "English", english],
+  ["簡體中文", "Simplified Chinese", simplifiedChinese],
+  ["繁體中文", "Traditional Chinese", traditionalChinese],
+  ["日文", "Japanese", japanese],
+  ["韓文", "Korean", korean],
+  ["西班牙文", "Spanish", spanish],
+  ["法文", "French", french],
+  ["義大利文", "Italian", italian],
+  ["捷克文", "Czech", czech],
+  ["葡萄牙文", "Portuguese", portuguese],
 ];
 
 export type Secret = { kind: "privateKey"; key: Hex; source: string } | { kind: "mnemonic"; phrase: string; language: string; source: string };
@@ -54,7 +56,7 @@ export const cleanInput = (s: string) =>
 /// askPassword：keystore 需要密碼時用
 export async function parseSecret(raw: string, askPassword: (q: string) => Promise<string>): Promise<Secret> {
   const input = cleanInput(raw);
-  if (!input) throw new Error("沒有輸入");
+  if (!input) throw new Error(tr("沒有輸入", "No input"));
 
   if (input.startsWith("op://")) {
     let value: string;
@@ -62,7 +64,8 @@ export async function parseSecret(raw: string, askPassword: (q: string) => Promi
       // 加逾時：op 卡住（網路、token 失效）時不能讓機器人一直卡在啟動
       value = execFileSync("op", ["read", input], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 20_000 });
     } catch (e) {
-      throw new Error(`1Password 讀不到 ${input}：${String((e as { stderr?: string }).stderr ?? e).trim()}`);
+      const detail = String((e as { stderr?: string }).stderr ?? e).trim();
+      throw new Error(tr(`1Password 讀不到 ${input}：${detail}`, `1Password can't read ${input}: ${detail}`));
     }
     const s = await parseSecret(value, askPassword);
     return { ...s, source: input };
@@ -73,14 +76,19 @@ export async function parseSecret(raw: string, askPassword: (q: string) => Promi
     : input.replace(/^~(?=\/)/, homedir());
   if (!input.includes(" ") && existsSync(keystorePath) && statSync(keystorePath).isFile()) {
     const json = JSON.parse(readFileSync(keystorePath, "utf8"));
-    const password = await askPassword(`keystore 密碼（${keystorePath}）：`);
+    const password = await askPassword(tr(`keystore 密碼（${keystorePath}）：`, `keystore password (${keystorePath}): `));
     return { kind: "privateKey", key: decryptKeystore(json, password), source: keystorePath };
   }
-  if (input.startsWith("foundry:")) throw new Error(`找不到 Foundry 帳戶 ${keystorePath}`);
+  if (input.startsWith("foundry:")) throw new Error(tr(`找不到 Foundry 帳戶 ${keystorePath}`, `Foundry account not found: ${keystorePath}`));
 
   const hex = input.replace(/\s+/g, "").replace(/^0x/i, "");
   if (/^[0-9a-fA-F]{64}$/.test(hex)) return { kind: "privateKey", key: `0x${hex.toLowerCase()}`, source: "私鑰" };
-  if (/^[0-9a-fA-F]{60,70}$/.test(hex)) throw new Error(`私鑰應該是 64 個十六進位字元，這裡有 ${hex.length} 個，可能少複製或多複製了`);
+  if (/^[0-9a-fA-F]{60,70}$/.test(hex)) throw new Error(
+      tr(
+        `私鑰應該是 64 個十六進位字元，這裡有 ${hex.length} 個，可能少複製或多複製了`,
+        `A private key is 64 hex characters, this one has ${hex.length}; part of it may be missing or extra`,
+      ),
+    );
 
   const { phrase, language } = normalizeMnemonic(input);
   return { kind: "mnemonic", phrase, language, source: "助記詞" };
@@ -99,27 +107,49 @@ function normalizeMnemonic(input: string): { phrase: string; language: string } 
     .filter((w) => w && !/^\d+$/.test(w));
 
   if (![12, 15, 18, 21, 24].includes(words.length)) {
-    throw new Error(`助記詞應該是 12、15、18、21 或 24 個字，這裡讀到 ${words.length} 個${words.length ? `（${words.slice(0, 3).join(" ")} …）` : ""}`);
+    const head = words.slice(0, 3).join(" ");
+    throw new Error(
+      tr(
+        `助記詞應該是 12、15、18、21 或 24 個字，這裡讀到 ${words.length} 個${words.length ? `（${head} …）` : ""}`,
+        `A mnemonic should be 12, 15, 18, 21 or 24 words, got ${words.length}${words.length ? ` (${head} …)` : ""}`,
+      ),
+    );
   }
 
   const norm = (list: string[]) => list.map((w) => w.normalize("NFKD"));
   // 簡繁中文有很多字重疊，檢查碼要每張單字表都試過才算錯
   let allWordsKnown = false;
-  for (const [language, list] of WORDLISTS) {
+  for (const [language, en, list] of WORDLISTS) {
     const nl = norm(list);
     const index = words.map((w) => nl.indexOf(w));
     if (!index.every((i) => i >= 0)) continue;
     allWordsKnown = true;
-    if (checksumOk(index)) return { phrase: words.map((_, j) => list[index[j]]).join(language === "日文" ? "　" : " "), language };
+    if (checksumOk(index)) return { phrase: words.map((_, j) => list[index[j]]).join(language === "日文" ? "　" : " "), language: tr(language, en) };
   }
-  if (allWordsKnown) throw new Error("助記詞每個字都對，但檢查碼不對：可能有字的順序錯了、或抄錯成另一個也在單字表裡的字");
+  if (allWordsKnown) {
+    throw new Error(
+      tr(
+        "助記詞每個字都對，但檢查碼不對：可能有字的順序錯了、或抄錯成另一個也在單字表裡的字",
+        "Every word is in the wordlist but the checksum is wrong: some words may be out of order, or one was miscopied as another valid word",
+      ),
+    );
+  }
 
   // 找最多字對得上的單字表，列出拼錯的字和最接近的建議
-  const [language, list] = WORDLISTS.map(([l, li]) => [l, norm(li)] as const).sort(
+  const [language, list] = WORDLISTS.map(([l, en, li]) => [tr(l, en), norm(li)] as const).sort(
     (a, b) => words.filter((w) => b[1].includes(w)).length - words.filter((w) => a[1].includes(w)).length,
   )[0];
-  const wrong = words.flatMap((w, i) => (list.includes(w) ? [] : [`第 ${i + 1} 個字「${w}」→ 是不是「${closest(w, list)}」？`]));
-  throw new Error(`助記詞（${language}）有 ${wrong.length} 個字不在單字表：\n  ${wrong.join("\n  ")}`);
+  const wrong = words.flatMap((w, i) => {
+    if (list.includes(w)) return [];
+    const c = closest(w, list);
+    return [tr(`第 ${i + 1} 個字「${w}」→ 是不是「${c}」？`, `word ${i + 1} "${w}" → did you mean "${c}"?`)];
+  });
+  throw new Error(
+    tr(
+      `助記詞（${language}）有 ${wrong.length} 個字不在單字表：\n  ${wrong.join("\n  ")}`,
+      `Mnemonic (${language}) has ${wrong.length} word(s) not in the wordlist:\n  ${wrong.join("\n  ")}`,
+    ),
+  );
 }
 
 /// BIP39：每個字 11 bits，最後 ENT/32 bits 是 sha256(entropy) 的前幾位
@@ -174,16 +204,16 @@ export function accountFor(s: Secret, path?: `m/44'/60'/${string}`): LocalAccoun
 /// Web3 Secret Storage v3（scrypt 或 pbkdf2 + aes-128-ctr，MAC 是 keccak256(key[16..32] ‖ ciphertext)）
 export function decryptKeystore(json: any, password: string): Hex {
   const c = json.crypto ?? json.Crypto;
-  if (!c || c.cipher !== "aes-128-ctr") throw new Error("看不懂這個 keystore 檔（不是 v3 格式）");
+  if (!c || c.cipher !== "aes-128-ctr") throw new Error(tr("看不懂這個 keystore 檔（不是 v3 格式）", "Can't read this keystore file (not v3 format)"));
   const p = c.kdfparams;
   const salt = Buffer.from(p.salt, "hex");
   let key: Buffer;
   if (c.kdf === "scrypt") key = scryptSync(password, salt, p.dklen, { N: p.n, r: p.r, p: p.p, maxmem: 256 * p.n * p.r * p.p + 1024 * 1024 });
   else if (c.kdf === "pbkdf2") key = pbkdf2Sync(password, salt, p.c, p.dklen, "sha256");
-  else throw new Error(`不支援的 kdf：${c.kdf}`);
+  else throw new Error(tr(`不支援的 kdf：${c.kdf}`, `Unsupported kdf: ${c.kdf}`));
   const ciphertext = Buffer.from(c.ciphertext, "hex");
   const mac = keccak256(concat([toHex(key.subarray(16, 32)), toHex(ciphertext)]));
-  if (mac.slice(2) !== String(c.mac).toLowerCase().replace(/^0x/, "")) throw new Error("keystore 密碼不對");
+  if (mac.slice(2) !== String(c.mac).toLowerCase().replace(/^0x/, "")) throw new Error(tr("keystore 密碼不對", "Wrong keystore password"));
   const decipher = createDecipheriv("aes-128-ctr", key.subarray(0, 16), Buffer.from(c.cipherparams.iv, "hex"));
   return toHex(Buffer.concat([decipher.update(ciphertext), decipher.final()]));
 }

@@ -12,7 +12,8 @@ The bot holds a short-ETH position: stablecoin collateral on Aave, WETH debt. It
 above Aave's oracle by `OPEN_PREMIUM_BPS` (default 3%) for `CONFIRM_SECONDS`, closes when the premium is gone, and
 deleverages on its own if the health factor drops. Read the repo README's risk section before helping anyone fund it.
 
-Reply in the user's language. The bot's own log lines are Traditional Chinese; translate them when you report.
+Reply in the user's language. The bot's own log lines are Traditional Chinese by default; translate them when you report,
+or add `BOT_LANG=en` to the env file for English output (finding codes are the same in both).
 
 ## Paths
 
