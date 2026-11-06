@@ -698,6 +698,10 @@ Closing tries single pools first because `closeVia` pays the extra 0.05% flash-l
 Not rehearsed: actual inclusion through Flashbots Protect on mainnet (KyberSwap routes do carry our 10-minute deadline in the calldata, verified 2026-10-30);
 KyberSwap quotes and execution in a real event; a real premium on Aerodrome/Velodrome pools; the bot on Arbitrum (only contract fork tests and read-only monitoring).
 
+## Support
+
+If this project saved you some time, you can [buy me a coffee](https://buymeacoffee.com/iml1s).
+
 ## License
 
 AGPL-3.0-only, see [LICENSE](LICENSE). You may use, change and share it; if you distribute a modified version, or run one
